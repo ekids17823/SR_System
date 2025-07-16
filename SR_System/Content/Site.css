@@ -1,0 +1,111 @@
+﻿html, body {
+    height: 100%;
+    margin: 0;
+}
+
+/* Web Forms 會將所有內容包裹在 <form> 標籤內。
+  因此我們將 form 設為 flex 容器來控制整體佈局，實現 sticky footer。
+*/
+form {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+main {
+    /* flex-grow: 1; 讓主要內容區塊自動填滿剩餘空間，將 footer 推向底部 */
+    flex: 1 0 auto;
+}
+
+footer {
+    /* flex-shrink: 0; 防止在內容過多時 footer 被壓縮 */
+    flex-shrink: 0;
+}
+
+/* ================================================================================
+檔案：/Content/Site.css
+變更：1. 新增了 main 的 margin-left，將其推到 Sidebar 的右側。
+      2. 調整了 Sidebar 的樣式，使其在不同螢幕尺寸下表現更佳。
+================================================================================ */
+body {
+    font-size: .875rem;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100; /* Behind the navbar */
+    padding: 48px 0 0; /* Height of navbar */
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+}
+
+@media (max-width: 767.98px) {
+    .sidebar {
+        top: 5rem;
+    }
+}
+
+.sidebar-sticky {
+    position: relative;
+    top: 0;
+    height: calc(100vh - 48px);
+    padding-top: .5rem;
+    overflow-x: hidden;
+    overflow-y: auto; /* Scrollable contents if viewport is shorter than content. */
+}
+
+.sidebar .nav-link {
+    font-weight: 500;
+    color: #333;
+}
+
+    .sidebar .nav-link .feather {
+        margin-right: 4px;
+        color: #727272;
+    }
+
+    .sidebar .nav-link.active {
+        color: #2470dc;
+    }
+
+        .sidebar .nav-link:hover .feather,
+        .sidebar .nav-link.active .feather {
+            color: inherit;
+        }
+
+.sidebar-heading {
+    font-size: .75rem;
+    text-transform: uppercase;
+}
+
+/* Navbar */
+.navbar-brand {
+    padding-top: .75rem;
+    padding-bottom: .75rem;
+    font-size: 1rem;
+    background-color: rgba(0, 0, 0, .25);
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
+}
+
+.navbar .navbar-toggler {
+    top: .25rem;
+    right: 1rem;
+}
+
+/* (關鍵修正) 主要內容區塊的樣式 */
+main {
+    padding-top: 1.5rem; /* 增加一些頂部間距 */
+}
+
+/* 當螢幕寬度大於 768px (中等螢幕及以上) 時，將主內容區往右推 */
+@media (min-width: 768px) {
+    main.col-md-9 {
+        margin-left: 25%; /* 假設 col-lg-2 大約是 16.66%，這裡留出一些空間 */
+    }
+
+    main.col-lg-10 {
+        margin-left: 16.66666667%;
+    }
+}
