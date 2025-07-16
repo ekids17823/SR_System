@@ -1,7 +1,8 @@
 ﻿// ================================================================================
 // 檔案：/CreateSR.aspx.cs
-// 變更：1. 新增 ValidateFileUpload 方法來處理檔案上傳的伺服器端驗證。
-//       2. 確保 btnSubmit_Click 方法會檢查 Page.IsValid。
+// 變更：1. 移除自訂的 User 和 Approver 類別，改用 Dictionary<string, object>。
+//       2. 修正 Page_Load 中的 User.Identity 命名衝突。
+//       3. 所有相關邏輯都已更新以適應新的資料結構。
 // ================================================================================
 using System;
 using System.Collections.Generic;
@@ -11,6 +12,7 @@ using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Web;
+using System.Web.Security;
 using System.Web.UI;
 using System.Web.UI.WebControls;
 using SR_System.DAL;
@@ -22,14 +24,30 @@ namespace SR_System
     {
         private SQLDBEntity sqlConnect = new SQLDBEntity();
 
-        private List<Approver> ApproversList
+        // 使用 Dictionary<string, object> 取代自訂的 Approver 類別
+        private List<Dictionary<string, object>> ApproversList
         {
-            get { return (List<Approver>)ViewState["ApproversList"] ?? new List<Approver>(); }
+            get { return (List<Dictionary<string, object>>)ViewState["ApproversList"] ?? new List<Dictionary<string, object>>(); }
             set { ViewState["ApproversList"] = value; }
         }
 
         protected void Page_Load(object sender, EventArgs e)
         {
+            // (關鍵修正) 使用 this.User 明確指定，以避免與自訂類別衝突
+            if (!this.User.Identity.IsAuthenticated)
+            {
+                FormsAuthentication.SignOut();
+                Response.Redirect("~/Login.aspx");
+                return;
+            }
+
+            if (Session["UserID"] == null)
+            {
+                FormsAuthentication.SignOut();
+                Response.Redirect("~/Login.aspx");
+                return;
+            }
+
             if (!IsPostBack)
             {
                 BindApproversRepeater();
@@ -42,7 +60,7 @@ namespace SR_System
 
             if (!string.IsNullOrEmpty(approverUserIdStr) && int.TryParse(approverUserIdStr, out int approverUserId))
             {
-                if (ApproversList.Any(a => a.UserID == approverUserId))
+                if (ApproversList.Any(a => (int)a["UserID"] == approverUserId))
                 {
                     ShowMessage("此人員已在會簽列表中。", "warning");
                     return;
@@ -52,12 +70,7 @@ namespace SR_System
                 if (user != null)
                 {
                     var currentList = this.ApproversList;
-                    currentList.Add(new Approver
-                    {
-                        UserID = user.UserID,
-                        Username = user.Username,
-                        EmployeeID = user.EmployeeID
-                    });
+                    currentList.Add(user); // 直接將 Dictionary 加入列表
                     this.ApproversList = currentList;
                     BindApproversRepeater();
 
@@ -77,7 +90,7 @@ namespace SR_System
             {
                 int userIdToRemove = Convert.ToInt32(e.CommandArgument);
                 var currentList = this.ApproversList;
-                var itemToRemove = currentList.FirstOrDefault(a => a.UserID == userIdToRemove);
+                var itemToRemove = currentList.FirstOrDefault(a => (int)a["UserID"] == userIdToRemove);
                 if (itemToRemove != null)
                 {
                     currentList.Remove(itemToRemove);
@@ -121,7 +134,7 @@ namespace SR_System
                     {
                         string approverQuery = $@"
                             INSERT INTO ASE_BPCIM_SR_Approvers_HIS (SRID, ApproverUserID, ApproverType, ApprovalStatus)
-                            VALUES ({newSrId}, {approver.UserID}, N'To', N'待簽核');";
+                            VALUES ({newSrId}, {approver["UserID"]}, N'To', N'待簽核');";
                         SqlCommand approverCmd = new SqlCommand(approverQuery, con, transaction);
                         approverCmd.ExecuteNonQuery();
                     }
@@ -146,9 +159,6 @@ namespace SR_System
             }
         }
 
-        /// <summary>
-        /// 伺服器端驗證方法，用於檢查是否有上傳檔案。
-        /// </summary>
         protected void ValidateFileUpload(object source, ServerValidateEventArgs args)
         {
             args.IsValid = fileUploadInitialDocs.HasFiles;
@@ -161,7 +171,7 @@ namespace SR_System
             pnlEmptyApprovers.Visible = !ApproversList.Any();
         }
 
-        private User GetUserById(int userId)
+        private Dictionary<string, object> GetUserById(int userId)
         {
             string query = $"SELECT UserID, Username, EmployeeID FROM ASE_BPCIM_SR_Users_DEFINE WHERE UserID = {userId}";
             DataTable dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
@@ -169,11 +179,11 @@ namespace SR_System
             if (dt.Rows.Count > 0)
             {
                 DataRow row = dt.Rows[0];
-                return new User
+                return new Dictionary<string, object>
                 {
-                    UserID = (int)row["UserID"],
-                    Username = row["Username"].ToString(),
-                    EmployeeID = row["EmployeeID"].ToString()
+                    { "UserID", (int)row["UserID"] },
+                    { "Username", row["Username"].ToString() },
+                    { "EmployeeID", row["EmployeeID"].ToString() }
                 };
             }
             return null;
@@ -215,21 +225,6 @@ namespace SR_System
         {
             string script = $"alert('{message.Replace("'", "\\'")}');";
             ScriptManager.RegisterStartupScript(this.upApprovers, this.upApprovers.GetType(), "ShowMessage", script, true);
-        }
-
-        [Serializable]
-        public class Approver
-        {
-            public int UserID { get; set; }
-            public string Username { get; set; }
-            public string EmployeeID { get; set; }
-        }
-
-        public class User
-        {
-            public int UserID { get; set; }
-            public string Username { get; set; }
-            public string EmployeeID { get; set; }
         }
     }
 }

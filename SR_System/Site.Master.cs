@@ -1,6 +1,6 @@
 ﻿// ================================================================================
 // 檔案：/Site.Master.cs
-// 變更：新增了控制 Sidebar 和 Toggler 可見性的公用屬性。
+// 變更：無變更
 // ================================================================================
 using System;
 using System.Web;
@@ -13,7 +13,6 @@ namespace SR_System
 {
     public partial class SiteMaster : MasterPage
     {
-        // 提供給子頁面控制 Sidebar 可見性的屬性
         public bool SidebarVisible
         {
             get { return pnlSidebar.Visible; }
@@ -21,7 +20,6 @@ namespace SR_System
             {
                 pnlSidebar.Visible = value;
                 pnlToggler.Visible = value;
-                // 如果 Sidebar 不可見，主內容區塊應該佔滿整個寬度
                 if (!value)
                 {
                     mainContent.Attributes["class"] = "col-12";
@@ -48,7 +46,6 @@ namespace SR_System
                 {
                     pnlUserInfo.Visible = false;
                     pnlLogin.Visible = true;
-                    // 如果未登入，預設隱藏 Sidebar
                     this.SidebarVisible = false;
                 }
             }

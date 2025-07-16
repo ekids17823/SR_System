@@ -1,11 +1,11 @@
 ﻿// ================================================================================
-// 檔案：/PendingApproval.aspx.cs (新增)
-// 說明：此頁面的後端程式碼，負責從資料庫載入待簽核的 SR 資料。
+// 檔案：/PendingApproval.aspx.cs
+// 變更：在 Page_Load 中加入對 Session 的檢查。
 // ================================================================================
 using System;
 using System.Data;
+using System.Web.Security;
 using System.Web.UI;
-using System.Web.UI.WebControls;
 using SR_System.DAL;
 
 namespace SR_System
@@ -16,6 +16,16 @@ namespace SR_System
 
         protected void Page_Load(object sender, EventArgs e)
         {
+            if (Session["UserID"] == null)
+            {
+                if (User.Identity.IsAuthenticated)
+                {
+                    FormsAuthentication.SignOut();
+                }
+                Response.Redirect("~/Login.aspx");
+                return;
+            }
+
             if (!IsPostBack)
             {
                 BindGridView();

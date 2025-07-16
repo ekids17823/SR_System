@@ -1,4 +1,11 @@
-﻿<%@ Page Title="建立新 SR" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="CreateSR.aspx.cs" Inherits="SR_System.CreateSR" %>
+﻿<%-- 
+================================================================================
+檔案：/CreateSR.aspx
+變更：修正了 Repeater 中的資料繫結語法，將 Eval("PropertyName") 改為 Eval("[KeyName]")，
+      以正確地從 Dictionary 中讀取資料。
+================================================================================
+--%>
+<%@ Page Title="建立新 SR" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="CreateSR.aspx.cs" Inherits="SR_System.CreateSR" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="PrimaryContent" runat="server">
     <h3>建立新的服務請求 (SR)</h3>
@@ -68,10 +75,11 @@
                         </HeaderTemplate>
                         <ItemTemplate>
                             <tr>
-                                <td><%# Eval("Username") %></td>
-                                <td><%# Eval("EmployeeID") %></td>
+                                <%-- (關鍵修正) 使用 Eval("[KeyName]") 語法來存取 Dictionary 的值 --%>
+                                <td><%# Eval("[Username]") %></td>
+                                <td><%# Eval("[EmployeeID]") %></td>
                                 <td>
-                                    <asp:Button ID="btnRemove" runat="server" Text="移除" CommandName="Remove" CommandArgument='<%# Eval("UserID") %>' CssClass="btn btn-danger btn-sm" />
+                                    <asp:Button ID="btnRemove" runat="server" Text="移除" CommandName="Remove" CommandArgument='<%# Eval("[UserID]") %>' CssClass="btn btn-danger btn-sm" />
                                 </td>
                             </tr>
                         </ItemTemplate>

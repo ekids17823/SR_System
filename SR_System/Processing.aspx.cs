@@ -1,9 +1,10 @@
 ﻿// ================================================================================
-// 檔案：/Processing.aspx.cs (新增)
-// 說明：此頁面的後端程式碼，負責從資料庫載入處理中的 SR 資料。
+// 檔案：/Processing.aspx.cs
+// 變更：在 Page_Load 中加入對 Session 的檢查。
 // ================================================================================
 using System;
 using System.Data;
+using System.Web.Security;
 using System.Web.UI;
 using SR_System.DAL;
 
@@ -15,6 +16,16 @@ namespace SR_System
 
         protected void Page_Load(object sender, EventArgs e)
         {
+            if (Session["UserID"] == null)
+            {
+                if (User.Identity.IsAuthenticated)
+                {
+                    FormsAuthentication.SignOut();
+                }
+                Response.Redirect("~/Login.aspx");
+                return;
+            }
+
             if (!IsPostBack)
             {
                 BindGridView();
@@ -40,12 +51,10 @@ namespace SR_System
                 LEFT JOIN ASE_BPCIM_SR_Users_DEFINE u_eng ON sr.AssignedEngineerID = u_eng.UserID
                 WHERE s.StatusName IN (N'待工程師確認', N'開發中', N'待User上傳結案報告', N'待工程師確認結單') ";
 
-            // 如果是工程師，只看指派給自己的
             if (currentUserRole == "Engineer")
             {
                 query += $" AND sr.AssignedEngineerID = {currentUserId}";
             }
-            // 主管或管理員則可以看到所有的
 
             query += " ORDER BY sr.AssignmentDate DESC";
 
