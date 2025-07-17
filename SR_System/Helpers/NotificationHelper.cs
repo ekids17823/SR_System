@@ -1,6 +1,9 @@
 ﻿// ================================================================================
-// 檔案：/Helpers/NotificationHelper.cs (新增)
-// 說明：集中處理所有郵件通知的邏輯。
+// 檔案：/Helpers/NotificationHelper.cs
+// 功能：集中處理所有郵件通知的邏輯。
+// 變更：1. 全面重構所有查詢，使其完全基於 EmployeeID 並從黃頁資料表獲取資訊。
+//       2. 修正了 GetApprovers 和 GetSrDetails 的邏輯。
+//       3. 新增了 GetCimBosses 和 GetCimLeader 方法以符合新的審核流程。
 // ================================================================================
 using System;
 using System.Collections.Generic;
@@ -15,15 +18,8 @@ namespace SR_System.Helpers
         /// <summary>
         /// 派送郵件的空殼方法。您可以在這裡填入您自己的郵件派送邏輯。
         /// </summary>
-        /// <param name="subject">郵件主旨</param>
-        /// <param name="body">郵件內容 (HTML 格式)</param>
-        /// <param name="to">收件人列表 (員工工號陣列)</param>
-        /// <param name="cc">副本收件人列表 (員工工號陣列)</param>
         public static void SendEmail(string subject, string body, string[] to, string[] cc)
         {
-            // --- 請在此處填入您的郵件派送邏輯 ---
-
-            // 偵錯用：在 Visual Studio 的輸出視窗顯示郵件內容，方便開發時驗證。
             System.Diagnostics.Debug.WriteLine("--- Sending Email ---");
             System.Diagnostics.Debug.WriteLine($"Subject: {subject}");
             System.Diagnostics.Debug.WriteLine($"To: {string.Join(", ", to)}");
@@ -41,35 +37,38 @@ namespace SR_System.Helpers
             var srDetails = GetSrDetails(srId);
             if (srDetails == null) return;
 
-            string subject = "";
-            string body = "";
-            List<string> toList = new List<string>();
-            List<string> ccList = new List<string>();
+            string srNumber = srDetails["SR_Number"].ToString();
+            string title = srDetails["Title"].ToString();
+            string requestorEmployeeId = srDetails["RequestorEmployeeID"].ToString();
+            string cimGroup = srDetails["CIM_Group"].ToString();
 
-            string srLink = $"<a href='http://your-server/ViewSR.aspx?SRID={srId}'>SR-{srId}: {srDetails["Title"]}</a>";
-            string baseBody = $"<p>您好，</p><p>關於服務請求單 {srLink} 有新的進度更新。</p>";
+            string subject = $"[SR-{srNumber}] {newStatusName}: {title}";
+            string body = $"<p>您好，</p><p>關於服務請求單 <a href='http://your-server/ViewSR.aspx?SRID={srId}'>SR-{srNumber}</a> 有新的進度更新，目前狀態為：<b>{newStatusName}</b>。</p>";
+            List<string> toList = new List<string>();
+            List<string> ccList = new List<string> { requestorEmployeeId }; // 開單人預設都會被 CC
 
             switch (newStatusName)
             {
-                case "待二階主管審核":
-                    subject = $"[SR-{srId}] 新服務請求待審核: {srDetails["Title"]}";
-                    // 從資料庫中找到 L2 主管
-                    var l2Supervisor = GetUserByRole("Supervisor_L2");
-                    if (l2Supervisor != null) toList.Add(l2Supervisor["EmployeeID"].ToString());
-                    body = $"{baseBody}<p>新的服務請求已提交，需要您進行二階審核。</p>";
-                    ccList.Add(srDetails["RequestorEmployeeID"].ToString());
+                case "待開單主管審核":
+                    var requesterManager = GetManagerFromYellowPages(requestorEmployeeId);
+                    if (requesterManager != null) toList.Add(requesterManager);
                     break;
 
                 case "待會簽審核":
-                    subject = $"[SR-{srId}] 服務請求待您會簽: {srDetails["Title"]}";
                     var approvers = GetApprovers(srId);
                     toList.AddRange(approvers.Select(a => a.EmployeeID));
                     ccList.AddRange(approvers.Select(a => a.ManagerEmployeeID).Where(m => !string.IsNullOrEmpty(m)));
-                    ccList.Add(srDetails["RequestorEmployeeID"].ToString());
-                    body = $"{baseBody}<p>此服務請求已通過高階主管審核，需要您進行會簽。</p>";
                     break;
 
-                    // 其他狀態的通知...
+                case "待CIM主管審核":
+                    toList.AddRange(GetCimBosses(cimGroup));
+                    break;
+
+                case "待CIM主任指派":
+                    toList.Add(GetCimLeader(cimGroup));
+                    break;
+
+                    // 其他狀態的通知可以陸續加入...
             }
 
             if (toList.Any())
@@ -81,25 +80,17 @@ namespace SR_System.Helpers
         private static Dictionary<string, object> GetSrDetails(int srId)
         {
             SQLDBEntity sqlConnect = new SQLDBEntity();
-            string query = $@"
-                SELECT 
-                    sr.Title, 
-                    u_req.EmployeeID as RequestorEmployeeID, 
-                    u_eng.EmployeeID as EngineerEmployeeID
-                FROM ASE_BPCIM_SR_HIS sr
-                JOIN ASE_BPCIM_SR_Users_DEFINE u_req ON sr.RequestorUserID = u_req.UserID
-                LEFT JOIN ASE_BPCIM_SR_Users_DEFINE u_eng ON sr.AssignedEngineerID = u_eng.UserID
-                WHERE sr.SRID = {srId}";
-
+            string query = $"SELECT SR_Number, Title, RequestorEmployeeID, CIM_Group FROM ASE_BPCIM_SR_HIS WHERE SRID = {srId}";
             var dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
             if (dt.Rows.Count > 0)
             {
                 var row = dt.Rows[0];
                 return new Dictionary<string, object>
                 {
+                    {"SR_Number", row["SR_Number"]},
                     {"Title", row["Title"]},
                     {"RequestorEmployeeID", row["RequestorEmployeeID"]},
-                    {"EngineerEmployeeID", row["EngineerEmployeeID"]}
+                    {"CIM_Group", row["CIM_Group"]}
                 };
             }
             return null;
@@ -109,34 +100,45 @@ namespace SR_System.Helpers
         {
             SQLDBEntity sqlConnect = new SQLDBEntity();
             string query = $@"
-                SELECT u.EmployeeID, u.ManagerEmployeeID 
+                SELECT sra.ApproverEmployeeID, yp.ManagerEmployeeID 
                 FROM ASE_BPCIM_SR_Approvers_HIS sra
-                JOIN ASE_BPCIM_SR_Users_DEFINE u ON sra.ApproverUserID = u.UserID
-                WHERE sra.SRID = {srId} AND sra.ApproverType = 'To'";
+                LEFT JOIN ASE_BPCIM_SR_YellowPages_TEST yp ON sra.ApproverEmployeeID = yp.EmployeeID
+                WHERE sra.SRID = {srId}";
 
             var dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
             return dt.AsEnumerable().Select(row => new User
             {
-                EmployeeID = row["EmployeeID"].ToString(),
+                EmployeeID = row["ApproverEmployeeID"].ToString(),
                 ManagerEmployeeID = row["ManagerEmployeeID"]?.ToString()
             }).ToList();
         }
 
-        private static Dictionary<string, object> GetUserByRole(string roleName)
+        private static List<string> GetCimBosses(string cimGroup)
         {
             SQLDBEntity sqlConnect = new SQLDBEntity();
-            string query = $@"
-                SELECT TOP 1 u.EmployeeID 
-                FROM ASE_BPCIM_SR_Users_DEFINE u
-                JOIN ASE_BPCIM_SR_Roles_DEFINE r ON u.RoleID = r.RoleID
-                WHERE r.RoleName = N'{roleName}'";
-
+            string query = $"SELECT Boss1EmployeeID, Boss2EmployeeID FROM ASE_BPCIM_SR_CIMLeaders_DEFINE WHERE CIM_Group = N'{cimGroup.Replace("'", "''")}'";
             var dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
+            var bosses = new List<string>();
             if (dt.Rows.Count > 0)
             {
-                return new Dictionary<string, object> { { "EmployeeID", dt.Rows[0]["EmployeeID"] } };
+                if (dt.Rows[0]["Boss1EmployeeID"] != DBNull.Value) bosses.Add(dt.Rows[0]["Boss1EmployeeID"].ToString());
+                if (dt.Rows[0]["Boss2EmployeeID"] != DBNull.Value) bosses.Add(dt.Rows[0]["Boss2EmployeeID"].ToString());
             }
-            return null;
+            return bosses;
+        }
+
+        private static string GetCimLeader(string cimGroup)
+        {
+            SQLDBEntity sqlConnect = new SQLDBEntity();
+            string query = $"SELECT LeaderEmployeeID FROM ASE_BPCIM_SR_CIMLeaders_DEFINE WHERE CIM_Group = N'{cimGroup.Replace("'", "''")}'";
+            return sqlConnect.Execute_Scalar("DefaultConnection", query)?.ToString();
+        }
+
+        private static string GetManagerFromYellowPages(string employeeId)
+        {
+            SQLDBEntity sqlConnect = new SQLDBEntity();
+            string query = $"SELECT ManagerEmployeeID FROM ASE_BPCIM_SR_YellowPages_TEST WHERE EmployeeID = N'{employeeId.Replace("'", "''")}'";
+            return sqlConnect.Execute_Scalar("DefaultConnection", query)?.ToString();
         }
 
         private class User

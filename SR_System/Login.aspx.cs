@@ -1,6 +1,7 @@
 ﻿// ================================================================================
 // 檔案：/Login.aspx.cs
-// 說明：處理使用者登入邏輯。
+// 功能：處理使用者登入、驗證、角色判斷與資料同步。
+// 變更：簡化了 ProvisionUserAndSetSession，不再需要查詢 Users_DEFINE 來獲取 UserID。
 // ================================================================================
 using System;
 using System.Collections.Generic;
@@ -17,7 +18,6 @@ namespace SR_System
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            // 在 Master Page 中找到 Sidebar 並將其隱藏
             if (this.Master is SiteMaster master)
             {
                 master.SidebarVisible = false;
@@ -58,61 +58,57 @@ namespace SR_System
         {
             var mockWsUsers = new Dictionary<string, string>
             {
-                { "admin", "password123" }, { "user001", "password123" }, { "eng001", "password123" },
-                { "eng002", "password123" }, { "l1_supervisor", "password123" }, { "l2_supervisor", "password123" },
-                { "signoff01", "password123" }, { "signoff02", "password123" }, { "newuser999", "password123" }
+                { "admin", "password123" }, { "user001", "password123" }, { "manager001", "password123" },
+                { "signoff01", "password123" }, { "signmanager01", "password123" },
+                { "cim_eng_a", "password123" }, { "cim_eng_b", "password123" },
+                { "leader1", "password123" }, { "leader2", "password123" },
+                { "boss1", "password123" }, { "boss2", "password123" }
             };
             return mockWsUsers.ContainsKey(employeeID) && mockWsUsers[employeeID] == password;
         }
 
         private bool ProvisionUserAndSetSession(string employeeID)
         {
-            int userId = 0;
-            string username = string.Empty;
-            string roleName = string.Empty;
-
             string sanitizedEmployeeID = employeeID.Replace("'", "''");
-            string query = $"SELECT u.UserID, u.Username, r.RoleName FROM ASE_BPCIM_SR_Users_DEFINE u JOIN ASE_BPCIM_SR_Roles_DEFINE r ON u.RoleID = r.RoleID WHERE u.EmployeeID = N'{sanitizedEmployeeID}' AND u.IsActive = 1";
 
-            DataTable dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
+            string yellowPagesQuery = $"SELECT * FROM ASE_BPCIM_SR_YellowPages_TEST WHERE EmployeeID = N'{sanitizedEmployeeID}'";
+            DataTable ypDt = sqlConnect.Get_Table_DATA("DefaultConnection", yellowPagesQuery);
 
-            if (dt.Rows.Count > 0)
+            if (ypDt.Rows.Count == 0)
             {
-                userId = Convert.ToInt32(dt.Rows[0]["UserID"]);
-                username = dt.Rows[0]["Username"].ToString();
-                roleName = dt.Rows[0]["RoleName"].ToString();
+                litMessage.Text = "<div class='alert alert-warning'>您的帳號存在，但未在公司黃頁中找到對應資料，請聯絡 IT。</div>";
+                return false;
             }
-            else
-            {
-                string defaultRole = "User";
-                string defaultUsername = sanitizedEmployeeID;
+            DataRow ypRow = ypDt.Rows[0];
 
-                string insertQuery = $@"
-                    INSERT INTO ASE_BPCIM_SR_Users_DEFINE (Username, EmployeeID, RoleID) 
-                    VALUES (N'{defaultUsername}', N'{sanitizedEmployeeID}', (SELECT RoleID FROM ASE_BPCIM_SR_Roles_DEFINE WHERE RoleName = N'{defaultRole}'));";
-
-                sqlConnect.Insert_Table_DATA("DefaultConnection", insertQuery);
-
-                DataTable newUserDt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
-                if (newUserDt.Rows.Count > 0)
-                {
-                    userId = Convert.ToInt32(newUserDt.Rows[0]["UserID"]);
-                    username = newUserDt.Rows[0]["Username"].ToString();
-                    roleName = newUserDt.Rows[0]["RoleName"].ToString();
-                }
-                else
-                {
-                    return false;
-                }
-            }
+            // 確保使用者存在於 Users_DEFINE 表中
+            int userId = FindOrCreateUserInSystem(employeeID);
 
             Session["UserID"] = userId;
-            Session["Username"] = username;
-            Session["RoleName"] = roleName;
+            Session["Username"] = ypRow["Username"].ToString();
+            Session["RoleName"] = ypRow["Position"].ToString();
             Session["EmployeeID"] = employeeID;
+            Session["Department"] = ypRow["Department"].ToString();
 
             UpdateLastLogin(userId);
             return true;
+        }
+
+        private int FindOrCreateUserInSystem(string employeeId)
+        {
+            string sanitizedEmployeeId = employeeId.Replace("'", "''");
+            string userQuery = $"SELECT UserID FROM ASE_BPCIM_SR_Users_DEFINE WHERE EmployeeID = N'{sanitizedEmployeeId}'";
+            object userIdObj = sqlConnect.Execute_Scalar("DefaultConnection", userQuery);
+
+            if (userIdObj != null)
+            {
+                return Convert.ToInt32(userIdObj);
+            }
+            else
+            {
+                string insertUserQuery = $"INSERT INTO ASE_BPCIM_SR_Users_DEFINE (EmployeeID) OUTPUT INSERTED.UserID VALUES (N'{sanitizedEmployeeId}');";
+                return (int)sqlConnect.Execute_Scalar("DefaultConnection", insertUserQuery);
+            }
         }
 
         private void UpdateLastLogin(int userId)

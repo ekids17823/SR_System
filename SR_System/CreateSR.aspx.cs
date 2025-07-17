@@ -1,14 +1,13 @@
 ﻿// ================================================================================
 // 檔案：/CreateSR.aspx.cs
-// 變更：1. 移除自訂的 User 和 Approver 類別，改用 Dictionary<string, object>。
-//       2. 修正 Page_Load 中的 User.Identity 命名衝突。
-//       3. 所有相關邏輯都已更新以適應新的資料結構。
+// 功能：處理建立新服務請求 (SR) 的所有後端邏輯。
+// 變更：1. 修正了 GetCimGroupForEngineer 方法，使其從黃頁查詢。
+//       2. 修正了 btnAddApprover_Click 和 rptApprovers_ItemCommand，使其完全基於 EmployeeID 操作。
 // ================================================================================
 using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
-using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Web;
@@ -24,7 +23,6 @@ namespace SR_System
     {
         private SQLDBEntity sqlConnect = new SQLDBEntity();
 
-        // 使用 Dictionary<string, object> 取代自訂的 Approver 類別
         private List<Dictionary<string, object>> ApproversList
         {
             get { return (List<Dictionary<string, object>>)ViewState["ApproversList"] ?? new List<Dictionary<string, object>>(); }
@@ -33,17 +31,9 @@ namespace SR_System
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            // (關鍵修正) 使用 this.User 明確指定，以避免與自訂類別衝突
-            if (!this.User.Identity.IsAuthenticated)
-            {
-                FormsAuthentication.SignOut();
-                Response.Redirect("~/Login.aspx");
-                return;
-            }
-
             if (Session["UserID"] == null)
             {
-                FormsAuthentication.SignOut();
+                if (User.Identity.IsAuthenticated) FormsAuthentication.SignOut();
                 Response.Redirect("~/Login.aspx");
                 return;
             }
@@ -54,28 +44,58 @@ namespace SR_System
             }
         }
 
+        protected void btnUpload_Click(object sender, EventArgs e)
+        {
+            if (fileUploadInitialDocs.HasFile)
+            {
+                string originalFileName = Path.GetFileName(fileUploadInitialDocs.PostedFile.FileName);
+                string uniqueFileName = Guid.NewGuid().ToString() + "_" + originalFileName;
+                string uploadFolder = Server.MapPath(ConfigurationManager.AppSettings["FileUploadPath"]);
+                if (!Directory.Exists(uploadFolder))
+                {
+                    Directory.CreateDirectory(uploadFolder);
+                }
+                string filePath = Path.Combine(uploadFolder, uniqueFileName);
+                fileUploadInitialDocs.SaveAs(filePath);
+
+                hdnFileInfo.Value = $"{uniqueFileName}|{originalFileName}";
+
+                hlUploadedFile.Text = $"已上傳: {originalFileName}";
+                hlUploadedFile.NavigateUrl = $"Handlers/FileDownloader.ashx?file={HttpUtility.UrlEncode(uniqueFileName)}";
+                hlUploadedFile.Visible = true;
+            }
+            else
+            {
+                ShowMessage("請選擇一個檔案進行上傳。", "warning");
+            }
+        }
+
         protected void btnAddApprover_Click(object sender, EventArgs e)
         {
-            string approverUserIdStr = hdnApproverUserId.Value;
+            string approverEmployeeId = hdnApproverEmployeeId.Value;
 
-            if (!string.IsNullOrEmpty(approverUserIdStr) && int.TryParse(approverUserIdStr, out int approverUserId))
+            if (!string.IsNullOrEmpty(approverEmployeeId))
             {
-                if (ApproversList.Any(a => (int)a["UserID"] == approverUserId))
+                if (ApproversList.Any(a => a["EmployeeID"].ToString().Equals(approverEmployeeId, StringComparison.OrdinalIgnoreCase)))
                 {
                     ShowMessage("此人員已在會簽列表中。", "warning");
                     return;
                 }
 
-                var user = GetUserById(approverUserId);
+                var user = GetUserFromYellowPages(approverEmployeeId);
                 if (user != null)
                 {
                     var currentList = this.ApproversList;
-                    currentList.Add(user); // 直接將 Dictionary 加入列表
+                    currentList.Add(user);
                     this.ApproversList = currentList;
                     BindApproversRepeater();
 
-                    hdnApproverUserId.Value = "";
+                    hdnApproverEmployeeId.Value = "";
                     txtApproverSearch.Value = "";
+                }
+                else
+                {
+                    ShowMessage("在黃頁中找不到此員工。", "danger");
                 }
             }
             else
@@ -88,9 +108,9 @@ namespace SR_System
         {
             if (e.CommandName == "Remove")
             {
-                int userIdToRemove = Convert.ToInt32(e.CommandArgument);
+                string employeeIdToRemove = e.CommandArgument.ToString();
                 var currentList = this.ApproversList;
-                var itemToRemove = currentList.FirstOrDefault(a => (int)a["UserID"] == userIdToRemove);
+                var itemToRemove = currentList.FirstOrDefault(a => a["EmployeeID"].ToString().Equals(employeeIdToRemove, StringComparison.OrdinalIgnoreCase));
                 if (itemToRemove != null)
                 {
                     currentList.Remove(itemToRemove);
@@ -104,64 +124,93 @@ namespace SR_System
         {
             if (!Page.IsValid) return;
 
-            int requestorUserId = (int)Session["UserID"];
-            string filePaths = UploadFiles();
-
-            string constr = ConfigurationManager.ConnectionStrings["DefaultConnection"].ConnectionString;
-            using (SqlConnection con = new SqlConnection(constr))
+            string engineerEmployeeId = hdnEngineerEmployeeId.Value;
+            if (string.IsNullOrEmpty(engineerEmployeeId))
             {
-                con.Open();
-                SqlTransaction transaction = con.BeginTransaction();
+                ShowMessage("提交失敗：請選擇一位有效的CIM工程師。", "danger");
+                return;
+            }
 
-                try
+            string requestorEmployeeId = Session["EmployeeID"].ToString();
+            string fileInfo = hdnFileInfo.Value;
+
+            string srNumber = GenerateSrNumber();
+            string cimGroup = GetCimGroupForEngineer(engineerEmployeeId);
+
+            if (string.IsNullOrEmpty(cimGroup))
+            {
+                ShowMessage("錯誤：找不到所選工程師對應的CIM組別。", "danger");
+                return;
+            }
+
+            try
+            {
+                string sanitizedTitle = txtTitle.Text.Trim().Replace("'", "''");
+                string sanitizedPurpose = txtPurpose.Text.Trim().Replace("'", "''");
+                string sanitizedScope = txtScope.Text.Trim().Replace("'", "''");
+                string sanitizedBenefit = txtBenefit.Text.Trim().Replace("'", "''");
+                string sanitizedFilePaths = (fileInfo ?? "").Replace("'", "''");
+                int statusId = GetStatusId("待開單主管審核");
+
+                string srQuery = $@"
+                    INSERT INTO ASE_BPCIM_SR_HIS (SR_Number, CIM_Group, Title, RequestorEmployeeID, Purpose, Scope, Benefit, InitialDocPath, CurrentStatusID, SubmitDate, AssignedEngineerEmployeeID)
+                    OUTPUT INSERTED.SRID
+                    VALUES (N'{srNumber}', N'{cimGroup}', N'{sanitizedTitle}', N'{requestorEmployeeId}', N'{sanitizedPurpose}', N'{sanitizedScope}', N'{sanitizedBenefit}', N'{sanitizedFilePaths}', {statusId}, GETDATE(), N'{engineerEmployeeId}');";
+
+                int newSrId = (int)sqlConnect.Execute_Scalar("DefaultConnection", srQuery);
+
+                if (ApproversList.Any())
                 {
-                    string sanitizedTitle = txtTitle.Text.Trim().Replace("'", "''");
-                    string sanitizedPurpose = txtPurpose.Text.Trim().Replace("'", "''");
-                    string sanitizedScope = txtScope.Text.Trim().Replace("'", "''");
-                    string sanitizedBenefit = txtBenefit.Text.Trim().Replace("'", "''");
-                    string sanitizedFilePaths = (filePaths ?? "").Replace("'", "''");
-                    int statusId = GetStatusId("待二階主管審核");
-
-                    string srQuery = $@"
-                        INSERT INTO ASE_BPCIM_SR_HIS (Title, RequestorUserID, Purpose, Scope, Benefit, InitialDocPath, CurrentStatusID, SubmitDate)
-                        OUTPUT INSERTED.SRID
-                        VALUES (N'{sanitizedTitle}', {requestorUserId}, N'{sanitizedPurpose}', N'{sanitizedScope}', N'{sanitizedBenefit}', N'{sanitizedFilePaths}', {statusId}, GETDATE());";
-
-                    SqlCommand srCmd = new SqlCommand(srQuery, con, transaction);
-                    int newSrId = (int)srCmd.ExecuteScalar();
-
                     foreach (var approver in ApproversList)
                     {
+                        string approverEmpId = approver["EmployeeID"].ToString();
                         string approverQuery = $@"
-                            INSERT INTO ASE_BPCIM_SR_Approvers_HIS (SRID, ApproverUserID, ApproverType, ApprovalStatus)
-                            VALUES ({newSrId}, {approver["UserID"]}, N'To', N'待簽核');";
-                        SqlCommand approverCmd = new SqlCommand(approverQuery, con, transaction);
-                        approverCmd.ExecuteNonQuery();
+                            INSERT INTO ASE_BPCIM_SR_Approvers_HIS (SRID, ApproverEmployeeID, ApprovalStatus)
+                            VALUES ({newSrId}, N'{approverEmpId}', N'待簽核');";
+                        sqlConnect.Insert_Table_DATA("DefaultConnection", approverQuery);
                     }
-
-                    string historyQuery = $@"
-                        INSERT INTO ASE_BPCIM_SR_Action_HIS (SRID, Action, ActionByUserID, NewStatusID, Notes)
-                        VALUES ({newSrId}, N'提交SR', {requestorUserId}, {statusId}, N'建立新的服務請求');";
-                    SqlCommand historyCmd = new SqlCommand(historyQuery, con, transaction);
-                    historyCmd.ExecuteNonQuery();
-
-                    transaction.Commit();
-
-                    NotificationHelper.SendNotificationForStatusChange(newSrId, "待二階主管審核");
-
-                    Response.Redirect($"~/ViewSR.aspx?SRID={newSrId}");
                 }
-                catch (Exception ex)
-                {
-                    transaction.Rollback();
-                    ShowMessage("提交失敗，發生錯誤: " + ex.Message, "danger");
-                }
+
+                string historyQuery = $@"
+                    INSERT INTO ASE_BPCIM_SR_Action_HIS (SRID, Action, ActionByEmployeeID, NewStatusID, Notes)
+                    VALUES ({newSrId}, N'提交SR', N'{requestorEmployeeId}', {statusId}, N'建立新的服務請求');";
+                sqlConnect.Insert_Table_DATA("DefaultConnection", historyQuery);
+
+                NotificationHelper.SendNotificationForStatusChange(newSrId, "待開單主管審核");
+
+                Response.Redirect($"~/ViewSR.aspx?SRID={newSrId}");
+            }
+            catch (Exception ex)
+            {
+                ShowMessage("提交失敗，發生錯誤: " + ex.Message, "danger");
+            }
+        }
+
+        private int FindOrCreateUserInSystem(string employeeId)
+        {
+            string sanitizedEmployeeId = employeeId.Replace("'", "''");
+            string userQuery = $"SELECT UserID FROM ASE_BPCIM_SR_Users_DEFINE WHERE EmployeeID = N'{sanitizedEmployeeId}'";
+            object userIdObj = sqlConnect.Execute_Scalar("DefaultConnection", userQuery);
+
+            if (userIdObj != null)
+            {
+                return Convert.ToInt32(userIdObj);
+            }
+            else
+            {
+                string insertUserQuery = $"INSERT INTO ASE_BPCIM_SR_Users_DEFINE (EmployeeID) OUTPUT INSERTED.UserID VALUES (N'{sanitizedEmployeeId}');";
+                return (int)sqlConnect.Execute_Scalar("DefaultConnection", insertUserQuery);
             }
         }
 
         protected void ValidateFileUpload(object source, ServerValidateEventArgs args)
         {
-            args.IsValid = fileUploadInitialDocs.HasFiles;
+            args.IsValid = !string.IsNullOrEmpty(hdnFileInfo.Value);
+        }
+
+        protected void ValidateEngineerSelection(object source, ServerValidateEventArgs args)
+        {
+            args.IsValid = !string.IsNullOrEmpty(hdnEngineerEmployeeId.Value);
         }
 
         private void BindApproversRepeater()
@@ -171,9 +220,24 @@ namespace SR_System
             pnlEmptyApprovers.Visible = !ApproversList.Any();
         }
 
-        private Dictionary<string, object> GetUserById(int userId)
+        private string GetCimGroupForEngineer(string engineerEmployeeId)
         {
-            string query = $"SELECT UserID, Username, EmployeeID FROM ASE_BPCIM_SR_Users_DEFINE WHERE UserID = {userId}";
+            string query = $"SELECT CIM_Group FROM ASE_BPCIM_SR_YellowPages_TEST WHERE EmployeeID = N'{engineerEmployeeId.Replace("'", "''")}'";
+            return sqlConnect.Execute_Scalar("DefaultConnection", query)?.ToString();
+        }
+
+        private string GenerateSrNumber()
+        {
+            string datePart = DateTime.Now.ToString("yyyyMMdd");
+            string query = $"SELECT COUNT(1) FROM ASE_BPCIM_SR_HIS WHERE SR_Number LIKE N'{datePart}-%'";
+            int count = (int)sqlConnect.Execute_Scalar("DefaultConnection", query);
+            return $"{datePart}-{(count + 1).ToString("D3")}";
+        }
+
+        private Dictionary<string, object> GetUserFromYellowPages(string employeeId)
+        {
+            string sanitizedId = employeeId.Replace("'", "''");
+            string query = $"SELECT EmployeeID, Username FROM ASE_BPCIM_SR_YellowPages_TEST WHERE EmployeeID = N'{sanitizedId}'";
             DataTable dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
 
             if (dt.Rows.Count > 0)
@@ -181,7 +245,6 @@ namespace SR_System
                 DataRow row = dt.Rows[0];
                 return new Dictionary<string, object>
                 {
-                    { "UserID", (int)row["UserID"] },
                     { "Username", row["Username"].ToString() },
                     { "EmployeeID", row["EmployeeID"].ToString() }
                 };
@@ -199,24 +262,19 @@ namespace SR_System
 
         private string UploadFiles()
         {
-            if (fileUploadInitialDocs.HasFiles)
+            if (fileUploadInitialDocs.HasFile)
             {
-                List<string> savedFilePaths = new List<string>();
+                string originalFileName = Path.GetFileName(fileUploadInitialDocs.PostedFile.FileName);
+                string uniqueFileName = Guid.NewGuid().ToString() + "_" + originalFileName;
                 string uploadFolder = Server.MapPath(ConfigurationManager.AppSettings["FileUploadPath"]);
                 if (!Directory.Exists(uploadFolder))
                 {
                     Directory.CreateDirectory(uploadFolder);
                 }
+                string filePath = Path.Combine(uploadFolder, uniqueFileName);
+                fileUploadInitialDocs.SaveAs(filePath);
 
-                foreach (HttpPostedFile postedFile in fileUploadInitialDocs.PostedFiles)
-                {
-                    string fileName = Path.GetFileName(postedFile.FileName);
-                    string uniqueFileName = Guid.NewGuid().ToString() + "_" + fileName;
-                    string filePath = Path.Combine(uploadFolder, uniqueFileName);
-                    postedFile.SaveAs(filePath);
-                    savedFilePaths.Add(uniqueFileName);
-                }
-                return string.Join(";", savedFilePaths);
+                return $"{uniqueFileName}|{originalFileName}";
             }
             return null;
         }

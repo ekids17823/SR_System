@@ -1,6 +1,7 @@
 ﻿// ================================================================================
 // 檔案：/History.aspx.cs
-// 變更：在 Page_Load 中加入對 Session 的檢查。
+// 功能：此頁面的後端程式碼，負責載入使用者的開單歷史紀錄。
+// 變更：修正了 BindGridView 中的 SQL 查詢，使其完全基於 EmployeeID 進行篩選。
 // ================================================================================
 using System;
 using System.Data;
@@ -16,7 +17,7 @@ namespace SR_System
 
         protected void Page_Load(object sender, EventArgs e)
         {
-            if (Session["UserID"] == null)
+            if (Session["EmployeeID"] == null)
             {
                 if (User.Identity.IsAuthenticated)
                 {
@@ -34,19 +35,19 @@ namespace SR_System
 
         private void BindGridView()
         {
-            int currentUserId = (int)Session["UserID"];
+            string currentEmployeeId = Session["EmployeeID"].ToString().Replace("'", "''");
             string query = $@"
                 SELECT 
                     sr.SRID, 
                     sr.Title, 
                     s.StatusName, 
-                    ISNULL(u_eng.Username, 'N/A') AS EngineerName,
+                    ISNULL(u_eng_yp.Username, 'N/A') AS EngineerName,
                     sr.SubmitDate,
                     sr.EngineerConfirmClosureDate
                 FROM ASE_BPCIM_SR_HIS sr
                 JOIN ASE_BPCIM_SR_Statuses_DEFINE s ON sr.CurrentStatusID = s.StatusID
-                LEFT JOIN ASE_BPCIM_SR_Users_DEFINE u_eng ON sr.AssignedEngineerID = u_eng.UserID
-                WHERE sr.RequestorUserID = {currentUserId}
+                LEFT JOIN ASE_BPCIM_SR_YellowPages_TEST u_eng_yp ON sr.AssignedEngineerEmployeeID = u_eng_yp.EmployeeID
+                WHERE sr.RequestorEmployeeID = N'{currentEmployeeId}'
                 ORDER BY sr.SubmitDate DESC";
 
             DataTable dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);

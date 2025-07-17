@@ -60,6 +60,42 @@ namespace SR_System
         protected global::System.Web.UI.WebControls.TextBox txtBenefit;
 
         /// <summary>
+        /// txtEngineerSearch 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.HtmlControls.HtmlInputText txtEngineerSearch;
+
+        /// <summary>
+        /// hdnEngineerEmployeeId 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HiddenField hdnEngineerEmployeeId;
+
+        /// <summary>
+        /// cvEngineer 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.CustomValidator cvEngineer;
+
+        /// <summary>
+        /// upFileUpload 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.UpdatePanel upFileUpload;
+
+        /// <summary>
         /// fileUploadInitialDocs 控制項。
         /// </summary>
         /// <remarks>
@@ -67,6 +103,33 @@ namespace SR_System
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
         protected global::System.Web.UI.WebControls.FileUpload fileUploadInitialDocs;
+
+        /// <summary>
+        /// btnUpload 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button btnUpload;
+
+        /// <summary>
+        /// hlUploadedFile 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HyperLink hlUploadedFile;
+
+        /// <summary>
+        /// hdnFileInfo 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HiddenField hdnFileInfo;
 
         /// <summary>
         /// cvFileUpload 控制項。
@@ -96,13 +159,13 @@ namespace SR_System
         protected global::System.Web.UI.HtmlControls.HtmlInputText txtApproverSearch;
 
         /// <summary>
-        /// hdnApproverUserId 控制項。
+        /// hdnApproverEmployeeId 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.HiddenField hdnApproverUserId;
+        protected global::System.Web.UI.WebControls.HiddenField hdnApproverEmployeeId;
 
         /// <summary>
         /// btnAddApprover 控制項。

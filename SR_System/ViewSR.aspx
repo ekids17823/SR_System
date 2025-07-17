@@ -1,13 +1,23 @@
-﻿<%@ Page Title="查看 SR" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="ViewSR.aspx.cs" Inherits="SR_System.ViewSR" %>
+﻿<%-- 
+================================================================================
+檔案：/ViewSR.aspx
+功能：顯示單一 SR 的詳細資訊，並根據使用者角色和 SR 狀態提供對應的操作。
+變更：1. 修正了附件 Repeater 的下載連結。
+      2. 新增了一個共用的「駁回/簽核意見」文字框。
+      3. 將結案報告上傳改為單檔模式。
+================================================================================
+--%>
+<%@ Page Title="查看 SR" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="ViewSR.aspx.cs" Inherits="SR_System.ViewSR" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="PrimaryContent" runat="server">
     <asp:Literal ID="litMessage" runat="server"></asp:Literal>
     
     <asp:Panel ID="pnlMainContent" runat="server">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3>SR-<%: Request.QueryString["SRID"] %>: <asp:Label ID="lblTitle" runat="server"></asp:Label></h3>
+            <h3>SR 單號: <asp:Label ID="lblSrNumber" runat="server"></asp:Label></h3>
             <h4><span class="badge bg-success"><asp:Label ID="lblStatus" runat="server"></asp:Label></span></h4>
         </div>
+        <h5>標題: <asp:Label ID="lblTitle" runat="server"></asp:Label></h5>
         <hr />
 
         <div class="card mb-4">
@@ -32,24 +42,19 @@
                 <h5>附件</h5>
                 <asp:Repeater ID="rptInitialDocs" runat="server">
                     <ItemTemplate>
-                        <a href='<%# GetDownloadUrl(Eval("FileName").ToString()) %>' target="_blank" class="me-3"><%# Eval("FileName") %></a>
+                        <a href='Handlers/FileDownloader.ashx?file=<%# HttpUtility.UrlEncode(Eval("UniqueFileName").ToString()) %>' class="me-3"><%# Eval("OriginalFileName") %></a>
                     </ItemTemplate>
                 </asp:Repeater>
             </div>
         </div>
 
-        <div class="card mb-4">
+        <asp:Panel ID="pnlApproverList" runat="server" Visible="false" class="card mb-4">
             <div class="card-header">會簽進度</div>
             <div class="card-body">
                 <asp:GridView ID="gvApprovers" runat="server" AutoGenerateColumns="False" CssClass="table table-sm">
                     <Columns>
                         <asp:BoundField DataField="Username" HeaderText="姓名" />
                         <asp:BoundField DataField="EmployeeID" HeaderText="工號" />
-                        <asp:TemplateField HeaderText="類型">
-                            <ItemTemplate>
-                                <span class='badge <%# Eval("ApproverType").ToString() == "To" ? "bg-primary" : "bg-info" %>'><%# Eval("ApproverType") %></span>
-                            </ItemTemplate>
-                        </asp:TemplateField>
                         <asp:TemplateField HeaderText="狀態">
                              <ItemTemplate>
                                 <span class='badge <%# GetStatusBadgeClass(Eval("ApprovalStatus").ToString()) %>'><%# Eval("ApprovalStatus") %></span>
@@ -60,33 +65,37 @@
                     </Columns>
                 </asp:GridView>
             </div>
-        </div>
+        </asp:Panel>
 
         <div class="card mb-4">
             <div class="card-header">操作</div>
             <div class="card-body">
-                <asp:Panel ID="pnlSupervisorL2Action" runat="server" Visible="false">
-                    <h5>二階主管審核</h5>
-                    <div class="mb-3">
-                        <label for="txtRejectionReason" class="form-label">拒絕原因 (若要拒絕請填寫)</label>
-                        <asp:TextBox ID="txtRejectionReason" runat="server" CssClass="form-control" TextMode="MultiLine" Rows="2"></asp:TextBox>
-                    </div>
-                    <asp:Button ID="btnL2Approve" runat="server" Text="同意" OnClick="btnL2Approve_Click" CssClass="btn btn-success me-2" />
-                    <asp:Button ID="btnL2Reject" runat="server" Text="拒絕" OnClick="btnL2Reject_Click" CssClass="btn btn-danger" />
+                <div class="mb-3">
+                    <label for="txtActionComments" class="form-label">簽核/駁回意見</label>
+                    <asp:TextBox ID="txtActionComments" runat="server" CssClass="form-control" TextMode="MultiLine" Rows="2"></asp:TextBox>
+                </div>
+                <hr />
+
+                <asp:Panel ID="pnlRequesterManagerAction" runat="server" Visible="false">
+                    <h5>開單主管審核</h5>
+                    <asp:Button ID="btnReqManagerApprove" runat="server" Text="同意" OnClick="btnReqManagerApprove_Click" CssClass="btn btn-success me-2" />
+                    <asp:Button ID="btnReqManagerReject" runat="server" Text="駁回" OnClick="btnAction_Reject" CssClass="btn btn-danger" />
                 </asp:Panel>
 
-                <asp:Panel ID="pnlApproverAction" runat="server" Visible="false">
+                <asp:Panel ID="pnlSignOffAction" runat="server" Visible="false">
                     <h5>我的會簽</h5>
-                     <div class="mb-3">
-                        <label for="txtApproverComments" class="form-label">簽核意見</label>
-                        <asp:TextBox ID="txtApproverComments" runat="server" CssClass="form-control" TextMode="MultiLine" Rows="2"></asp:TextBox>
-                    </div>
-                    <asp:Button ID="btnApprove" runat="server" Text="同意" OnClick="btnApprove_Click" CssClass="btn btn-success me-2" />
-                    <asp:Button ID="btnReject" runat="server" Text="拒絕" OnClick="btnReject_Click" CssClass="btn btn-danger" />
+                    <asp:Button ID="btnSignOffApprove" runat="server" Text="同意" OnClick="btnSignOffApprove_Click" CssClass="btn btn-success me-2" />
+                    <asp:Button ID="btnSignOffReject" runat="server" Text="駁回" OnClick="btnAction_Reject" CssClass="btn btn-danger" />
+                </asp:Panel>
+                
+                <asp:Panel ID="pnlCimBossAction" runat="server" Visible="false">
+                    <h5>CIM 主管審核</h5>
+                    <asp:Button ID="btnCimBossApprove" runat="server" Text="同意" OnClick="btnCimBossApprove_Click" CssClass="btn btn-success me-2" />
+                    <asp:Button ID="btnCimBossReject" runat="server" Text="駁回" OnClick="btnAction_Reject" CssClass="btn btn-danger" />
                 </asp:Panel>
 
-                <asp:Panel ID="pnlSupervisorL1Action" runat="server" Visible="false">
-                    <h5>一階主管指派</h5>
+                <asp:Panel ID="pnlCimLeaderAction" runat="server" Visible="false">
+                    <h5>CIM 主任指派</h5>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="ddlEngineers" class="form-label">選擇工程師</label>
@@ -103,15 +112,16 @@
                 <asp:Panel ID="pnlEngineerAction" runat="server" Visible="false">
                     <h5>工程師操作</h5>
                     <asp:Button ID="btnAcceptSR" runat="server" Text="確認接單" OnClick="btnAcceptSR_Click" CssClass="btn btn-primary me-2" />
-                    <asp:Button ID="btnCompleteDev" runat="server" Text="完成開發，通知User上傳報告" OnClick="btnCompleteDev_Click" CssClass="btn btn-info me-2" />
+                    <asp:Button ID="btnCompleteDev" runat="server" Text="完成開發" OnClick="btnCompleteDev_Click" CssClass="btn btn-info me-2" />
+                    <asp:Button ID="btnDeploy" runat="server" Text="程式上線" OnClick="btnDeploy_Click" CssClass="btn btn-warning me-2" />
                     <asp:Button ID="btnConfirmClosure" runat="server" Text="確認結單" OnClick="btnConfirmClosure_Click" CssClass="btn btn-success" />
                 </asp:Panel>
                 
                  <asp:Panel ID="pnlUserAction" runat="server" Visible="false">
                     <h5>需求者操作</h5>
                     <div class="mb-3">
-                        <label for="fileUploadClosureReport" class="form-label">上傳結案報告 (可多選)</label>
-                        <asp:FileUpload ID="fileUploadClosureReport" runat="server" AllowMultiple="true" CssClass="form-control" />
+                        <label for="fileUploadClosureReport" class="form-label">上傳測試報告</label>
+                        <asp:FileUpload ID="fileUploadClosureReport" runat="server" AllowMultiple="false" CssClass="form-control" />
                     </div>
                     <asp:Button ID="btnUploadClosureReport" runat="server" Text="上傳並通知工程師" OnClick="btnUploadClosureReport_Click" CssClass="btn btn-primary" />
                 </asp:Panel>

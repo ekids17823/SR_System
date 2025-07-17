@@ -33,13 +33,13 @@ namespace SR_System
         protected global::System.Web.UI.WebControls.Panel pnlMainContent;
 
         /// <summary>
-        /// lblTitle 控制項。
+        /// lblSrNumber 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Label lblTitle;
+        protected global::System.Web.UI.WebControls.Label lblSrNumber;
 
         /// <summary>
         /// lblStatus 控制項。
@@ -49,6 +49,15 @@ namespace SR_System
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
         protected global::System.Web.UI.WebControls.Label lblStatus;
+
+        /// <summary>
+        /// lblTitle 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Label lblTitle;
 
         /// <summary>
         /// lblRequestor 控制項。
@@ -123,6 +132,15 @@ namespace SR_System
         protected global::System.Web.UI.WebControls.Repeater rptInitialDocs;
 
         /// <summary>
+        /// pnlApproverList 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Panel pnlApproverList;
+
+        /// <summary>
         /// gvApprovers 控制項。
         /// </summary>
         /// <remarks>
@@ -132,85 +150,103 @@ namespace SR_System
         protected global::System.Web.UI.WebControls.GridView gvApprovers;
 
         /// <summary>
-        /// pnlSupervisorL2Action 控制項。
+        /// txtActionComments 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Panel pnlSupervisorL2Action;
+        protected global::System.Web.UI.WebControls.TextBox txtActionComments;
 
         /// <summary>
-        /// txtRejectionReason 控制項。
+        /// pnlRequesterManagerAction 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.TextBox txtRejectionReason;
+        protected global::System.Web.UI.WebControls.Panel pnlRequesterManagerAction;
 
         /// <summary>
-        /// btnL2Approve 控制項。
+        /// btnReqManagerApprove 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Button btnL2Approve;
+        protected global::System.Web.UI.WebControls.Button btnReqManagerApprove;
 
         /// <summary>
-        /// btnL2Reject 控制項。
+        /// btnReqManagerReject 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Button btnL2Reject;
+        protected global::System.Web.UI.WebControls.Button btnReqManagerReject;
 
         /// <summary>
-        /// pnlApproverAction 控制項。
+        /// pnlSignOffAction 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Panel pnlApproverAction;
+        protected global::System.Web.UI.WebControls.Panel pnlSignOffAction;
 
         /// <summary>
-        /// txtApproverComments 控制項。
+        /// btnSignOffApprove 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.TextBox txtApproverComments;
+        protected global::System.Web.UI.WebControls.Button btnSignOffApprove;
 
         /// <summary>
-        /// btnApprove 控制項。
+        /// btnSignOffReject 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Button btnApprove;
+        protected global::System.Web.UI.WebControls.Button btnSignOffReject;
 
         /// <summary>
-        /// btnReject 控制項。
+        /// pnlCimBossAction 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Button btnReject;
+        protected global::System.Web.UI.WebControls.Panel pnlCimBossAction;
 
         /// <summary>
-        /// pnlSupervisorL1Action 控制項。
+        /// btnCimBossApprove 控制項。
         /// </summary>
         /// <remarks>
         /// 自動產生的欄位。
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Panel pnlSupervisorL1Action;
+        protected global::System.Web.UI.WebControls.Button btnCimBossApprove;
+
+        /// <summary>
+        /// btnCimBossReject 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button btnCimBossReject;
+
+        /// <summary>
+        /// pnlCimLeaderAction 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Panel pnlCimLeaderAction;
 
         /// <summary>
         /// ddlEngineers 控制項。
@@ -265,6 +301,15 @@ namespace SR_System
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
         protected global::System.Web.UI.WebControls.Button btnCompleteDev;
+
+        /// <summary>
+        /// btnDeploy 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button btnDeploy;
 
         /// <summary>
         /// btnConfirmClosure 控制項。

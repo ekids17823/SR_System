@@ -1,7 +1,8 @@
 ﻿<%-- 
 ================================================================================
 檔案：/Site.Master
-變更：1. 確保 main 標籤有正確的 class，以便 CSS 能選取到它。
+變更：1. 移除了 <main> 標籤內的標題區塊 <div>。
+      2. 在主要內容區的容器 <div> 上加入了 pt-3 padding，以補償移除的間距。
 ================================================================================
 --%>
 <%@ Master Language="C#" AutoEventWireup="true" CodeBehind="Site.Master.cs" Inherits="SR_System.SiteMaster" %>
@@ -61,11 +62,21 @@
                 </asp:Panel>
 
                 <main id="mainContent" runat="server" class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                    <asp:ContentPlaceHolder ID="PrimaryContent" runat="server">
-                    </asp:ContentPlaceHolder>
+                    <div class="pt-3 mb-5"> <%-- 增加頂部和底部間距 --%>
+                        <asp:ContentPlaceHolder ID="PrimaryContent" runat="server">
+                        </asp:ContentPlaceHolder>
+                    </div>
                 </main>
             </div>
         </div>
+        
+        <footer class="footer mt-auto py-3 bg-light">
+            <div class="container">
+                <div id="copyright">
+                    <p class="text-center text-muted">&copy; 2025 ASE_BUMPING_CIM All Rights Reserved</p>
+                </div>
+            </div>
+        </footer>
     </form>
     
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

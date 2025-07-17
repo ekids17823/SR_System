@@ -1,6 +1,7 @@
 ﻿// ================================================================================
-// 檔案：/SearchUsers.ashx.cs
-// 變更：所有資料庫存取改為傳遞 string 型別的 SQL 命令。
+// 檔案：/Handlers/SearchUsers.ashx.cs
+// 功能：處理使用者搜尋的 AJAX 請求。
+// 變更：查詢來源改為黃頁資料表，並移除對 Users_DEFINE 的 JOIN。
 // ================================================================================
 using System;
 using System.Collections.Generic;
@@ -19,18 +20,27 @@ namespace SR_System
             if (context.Session["UserID"] == null)
             {
                 context.Response.StatusCode = 401;
-                context.Response.StatusDescription = "Unauthorized";
                 context.Response.End();
                 return;
             }
 
-            string term = (context.Request["term"] ?? "").Replace("'", "''"); // Sanitize
-            int currentUserId = (int)context.Session["UserID"];
+            string term = (context.Request["term"] ?? "").Replace("'", "''");
+            string roleFilter = context.Request["role"];
+            string currentEmployeeID = context.Session["EmployeeID"].ToString();
 
             List<object> users = new List<object>();
             SQLDBEntity sqlConnect = new SQLDBEntity();
 
-            string query = $"SELECT UserID, Username, EmployeeID FROM ASE_BPCIM_SR_Users_DEFINE WHERE (Username LIKE N'%{term}%' OR EmployeeID LIKE N'%{term}%') AND UserID != {currentUserId} AND IsActive = 1";
+            string query = $@"
+                SELECT EmployeeID, Username 
+                FROM ASE_BPCIM_SR_YellowPages_TEST 
+                WHERE (Username LIKE N'%{term}%' OR EmployeeID LIKE N'%{term}%') 
+                AND EmployeeID != N'{currentEmployeeID}'";
+
+            if (!string.IsNullOrEmpty(roleFilter) && roleFilter.Equals("Engineer", StringComparison.OrdinalIgnoreCase))
+            {
+                query += " AND Position = N'工程師'";
+            }
 
             var dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
 
@@ -38,7 +48,6 @@ namespace SR_System
             {
                 users.Add(new
                 {
-                    UserID = row["UserID"],
                     Username = row["Username"].ToString(),
                     EmployeeID = row["EmployeeID"].ToString()
                 });

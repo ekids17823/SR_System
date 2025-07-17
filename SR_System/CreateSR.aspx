@@ -1,16 +1,13 @@
 ﻿<%-- 
 ================================================================================
 檔案：/CreateSR.aspx
-變更：修正了 Repeater 中的資料繫結語法，將 Eval("PropertyName") 改為 Eval("[KeyName]")，
-      以正確地從 Dictionary 中讀取資料。
+變更：1. 將工程師的 HiddenField ID 從 hdnEngineerId 改為 hdnEngineerEmployeeId。
+      2. 修正了 JavaScript，使其能正確操作新的 HiddenField ID。
 ================================================================================
 --%>
-<%@ Page Title="建立新 SR" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="CreateSR.aspx.cs" Inherits="SR_System.CreateSR" %>
+<%@ Page Title="開單 New SR" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="CreateSR.aspx.cs" Inherits="SR_System.CreateSR" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="PrimaryContent" runat="server">
-    <h3>建立新的服務請求 (SR)</h3>
-    <hr />
-
     <asp:Literal ID="litMessage" runat="server"></asp:Literal>
 
     <div class="card mb-4">
@@ -37,15 +34,37 @@
                 <asp:RequiredFieldValidator runat="server" ControlToValidate="txtBenefit" ErrorMessage="效益為必填欄位。" CssClass="text-danger" Display="Dynamic" ValidationGroup="SRValidation" />
             </div>
             <div class="mb-3">
-                <label for="fileUploadInitialDocs" class="form-label">上傳需求書 (可多選) <span class="text-danger">*</span></label>
-                <asp:FileUpload ID="fileUploadInitialDocs" runat="server" AllowMultiple="true" CssClass="form-control" />
-                <asp:CustomValidator runat="server" ID="cvFileUpload" ControlToValidate="fileUploadInitialDocs" ErrorMessage="請至少上傳一個檔案。" OnServerValidate="ValidateFileUpload" CssClass="text-danger" Display="Dynamic" ValidationGroup="SRValidation" />
+                <label for="txtEngineerSearch" class="form-label">指定CIM工程師 <span class="text-danger">*</span></label>
+                <input type="text" id="txtEngineerSearch" runat="server" class="form-control" />
+                <asp:HiddenField ID="hdnEngineerEmployeeId" runat="server" />
+                <asp:CustomValidator ID="cvEngineer" runat="server" ErrorMessage="請從選單中選擇一位有效的CIM工程師。" 
+                    ControlToValidate="txtEngineerSearch" OnServerValidate="ValidateEngineerSelection" 
+                    CssClass="text-danger" Display="Dynamic" ValidationGroup="SRValidation" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">上傳需求書 <span class="text-danger">*</span></label>
+                <asp:UpdatePanel ID="upFileUpload" runat="server" UpdateMode="Conditional">
+                    <ContentTemplate>
+                        <div class="input-group">
+                            <asp:FileUpload ID="fileUploadInitialDocs" runat="server" CssClass="form-control" />
+                            <asp:Button ID="btnUpload" runat="server" Text="上傳" OnClick="btnUpload_Click" CssClass="btn btn-outline-secondary" />
+                        </div>
+                        <asp:HyperLink ID="hlUploadedFile" runat="server" Visible="false" Target="_blank" CssClass="d-block mt-2"></asp:HyperLink>
+                        <asp:HiddenField ID="hdnFileInfo" runat="server" />
+                        <asp:CustomValidator runat="server" ID="cvFileUpload" ErrorMessage="請上傳一個檔案。" OnServerValidate="ValidateFileUpload" CssClass="text-danger" Display="Dynamic" ValidationGroup="SRValidation" />
+                    </ContentTemplate>
+                    <Triggers>
+                        <asp:PostBackTrigger ControlID="btnUpload" />
+                    </Triggers>
+                </asp:UpdatePanel>
             </div>
         </div>
     </div>
 
     <div class="card">
-        <div class="card-header">會簽人員設定</div>
+        <div class="card-header">
+            會簽人員設定 (可選)
+        </div>
         <div class="card-body">
             <asp:UpdatePanel ID="upApprovers" runat="server" UpdateMode="Conditional">
                 <ContentTemplate>
@@ -53,7 +72,7 @@
                         <div class="col-md-8">
                             <label for="txtApproverSearch" class="form-label">搜尋會簽人員 (輸入姓名或工號)</label>
                             <input type="text" id="txtApproverSearch" runat="server" class="form-control" />
-                            <asp:HiddenField ID="hdnApproverUserId" runat="server" />
+                            <asp:HiddenField ID="hdnApproverEmployeeId" runat="server" />
                         </div>
                         <div class="col-md-4 align-self-end">
                             <asp:Button ID="btnAddApprover" runat="server" Text="加入會簽" OnClick="btnAddApprover_Click" CssClass="btn btn-secondary w-100" />
@@ -75,11 +94,10 @@
                         </HeaderTemplate>
                         <ItemTemplate>
                             <tr>
-                                <%-- (關鍵修正) 使用 Eval("[KeyName]") 語法來存取 Dictionary 的值 --%>
                                 <td><%# Eval("[Username]") %></td>
                                 <td><%# Eval("[EmployeeID]") %></td>
                                 <td>
-                                    <asp:Button ID="btnRemove" runat="server" Text="移除" CommandName="Remove" CommandArgument='<%# Eval("[UserID]") %>' CssClass="btn btn-danger btn-sm" />
+                                    <asp:Button ID="btnRemove" runat="server" Text="移除" CommandName="Remove" CommandArgument='<%# Eval("[EmployeeID]") %>' CssClass="btn btn-danger btn-sm" />
                                 </td>
                             </tr>
                         </ItemTemplate>
@@ -100,17 +118,17 @@
     </div>
     
     <div class="mt-4 text-end">
-        <asp:Button ID="btnSubmit" runat="server" Text="提交服務請求" OnClick="btnSubmit_Click" CssClass="btn btn-success btn-lg" ValidationGroup="SRValidation" />
+        <asp:Button ID="btnSubmit" runat="server" Text="開單送出" OnClick="btnSubmit_Click" CssClass="btn btn-success btn-lg" ValidationGroup="SRValidation" />
     </div>
 </asp:Content>
 
 <asp:Content ID="Content2" ContentPlaceHolderID="Scripts" runat="server">
 <script type="text/javascript">
     function pageLoad() {
-        $("#<%= txtApproverSearch.ClientID %>").autocomplete({
+        $("#<%= txtEngineerSearch.ClientID %>").autocomplete({
             source: function (request, response) {
                 $.ajax({
-                    url: "SearchUsers.ashx",
+                    url: "Handlers/SearchUsers.ashx?role=Engineer",
                     data: { term: request.term },
                     dataType: "json",
                     type: "GET",
@@ -119,26 +137,43 @@
                             return {
                                 label: item.Username + ' (' + item.EmployeeID + ')',
                                 value: item.Username,
-                                userId: item.UserID
+                                employeeId: item.EmployeeID
                             };
                         }));
-                    },
-                    error: function (xhr, status, error) {
-                        console.error("Autocomplete error: " + error);
                     }
                 });
             },
-            minLength: 2,
+            minLength: 1,
             select: function (event, ui) {
-                $("#<%= hdnApproverUserId.ClientID %>").val(ui.item.userId);
+                $("#<%= hdnEngineerEmployeeId.ClientID %>").val(ui.item.employeeId);
                 $(this).val(ui.item.label);
                 return false;
             }
         });
 
-        $("#<%= txtApproverSearch.ClientID %>").on("input", function() {
-            if ($(this).val() === "") {
-                $("#<%= hdnApproverUserId.ClientID %>").val("");
+        $("#<%= txtApproverSearch.ClientID %>").autocomplete({
+            source: function (request, response) {
+                $.ajax({
+                    url: "Handlers/SearchUsers.ashx",
+                    data: { term: request.term },
+                    dataType: "json",
+                    type: "GET",
+                    success: function (data) {
+                        response($.map(data, function (item) {
+                            return {
+                                label: item.Username + ' (' + item.EmployeeID + ')',
+                                value: item.Username,
+                                employeeId: item.EmployeeID
+                            };
+                        }));
+                    }
+                });
+            },
+            minLength: 2,
+            select: function (event, ui) {
+                $("#<%= hdnApproverEmployeeId.ClientID %>").val(ui.item.employeeId);
+                $(this).val(ui.item.label);
+                return false;
             }
         });
     }

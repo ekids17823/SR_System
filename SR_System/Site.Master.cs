@@ -1,6 +1,6 @@
 ﻿// ================================================================================
 // 檔案：/Site.Master.cs
-// 變更：無變更
+// 功能：網站的共用母版頁後端程式碼。
 // ================================================================================
 using System;
 using System.Web;
@@ -56,7 +56,6 @@ namespace SR_System
             string role = Session["RoleName"]?.ToString() ?? "";
             var navLinks = new System.Text.StringBuilder();
 
-            navLinks.Append(CreateNavItem("~/PendingApproval.aspx", "bi-pencil-square", "待簽核"));
             navLinks.Append(CreateNavItem("~/CreateSR.aspx", "bi-file-earmark-plus-fill", "開單 New SR"));
             navLinks.Append(CreateNavItem("~/Processing.aspx", "bi-gear-fill", "處理中"));
             navLinks.Append(CreateNavItem("~/History.aspx", "bi-clock-history", "開單紀錄"));
