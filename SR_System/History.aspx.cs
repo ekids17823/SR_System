@@ -39,6 +39,7 @@ namespace SR_System
             string query = $@"
                 SELECT 
                     sr.SRID, 
+                    sr.SR_Number, 
                     sr.Title, 
                     s.StatusName, 
                     ISNULL(u_eng_yp.Username, 'N/A') AS EngineerName,

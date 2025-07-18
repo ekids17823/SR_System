@@ -1,8 +1,8 @@
 ﻿// ================================================================================
 // 檔案：/CreateSR.aspx.cs
-// 功能：處理建立新服務請求 (SR) 的所有後端邏輯。
-// 變更：1. 修正了 GetCimGroupForEngineer 方法，使其從黃頁查詢。
-//       2. 修正了 btnAddApprover_Click 和 rptApprovers_ItemCommand，使其完全基於 EmployeeID 操作。
+// 功能：處理建立或編輯服務請求 (SR) 的所有後端邏輯。
+// 變更：1. UploadFiles 方法現在會從 Web.config 讀取正確的初始文件路徑。
+//       2. btnUpload_Click 中產生的下載連結現在會附帶 type=initial 參數。
 // ================================================================================
 using System;
 using System.Collections.Generic;
@@ -40,8 +40,69 @@ namespace SR_System
 
             if (!IsPostBack)
             {
-                BindApproversRepeater();
+                if (!string.IsNullOrEmpty(Request.QueryString["SR_Number"]))
+                {
+                    string srNumber = Request.QueryString["SR_Number"];
+                    LoadSrDataForEditing(srNumber);
+                }
             }
+        }
+
+        private void LoadSrDataForEditing(string srNumber)
+        {
+            string sanitizedSrNumber = srNumber.Replace("'", "''");
+            string query = $"SELECT * FROM ASE_BPCIM_SR_HIS WHERE SR_Number = N'{sanitizedSrNumber}'";
+            DataTable dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
+
+            if (dt.Rows.Count > 0)
+            {
+                DataRow row = dt.Rows[0];
+                hdnSrId.Value = row["SRID"].ToString();
+                pnlNewSrActions.Visible = false;
+                pnlEditSrActions.Visible = true;
+
+                txtTitle.Text = row["Title"].ToString();
+                txtPurpose.Text = row["Purpose"].ToString();
+                txtScope.Text = row["Scope"].ToString();
+                txtBenefit.Text = row["Benefit"].ToString();
+
+                var engineer = GetUserFromYellowPages(row["AssignedEngineerEmployeeID"].ToString());
+                if (engineer != null)
+                {
+                    hdnEngineerEmployeeId.Value = engineer["EmployeeID"].ToString();
+                    txtEngineerSearch.Value = $"{engineer["Username"]} ({engineer["EmployeeID"]})";
+                }
+
+                string fileInfo = row["InitialDocPath"].ToString();
+                if (!string.IsNullOrEmpty(fileInfo))
+                {
+                    hdnFileInfo.Value = fileInfo;
+                    var parts = fileInfo.Split('|');
+                    hlUploadedFile.Text = $"已上傳: {parts[1]}";
+                    hlUploadedFile.NavigateUrl = $"Handlers/FileDownloader.ashx?file={HttpUtility.UrlEncode(parts[0])}&type=initial";
+                    hlUploadedFile.Visible = true;
+                }
+
+                LoadApproversForEditing(Convert.ToInt32(row["SRID"]));
+            }
+        }
+
+        private void LoadApproversForEditing(int srId)
+        {
+            string query = $"SELECT ApproverEmployeeID FROM ASE_BPCIM_SR_Approvers_HIS WHERE SRID = {srId}";
+            DataTable dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
+
+            var currentList = new List<Dictionary<string, object>>();
+            foreach (DataRow row in dt.Rows)
+            {
+                var user = GetUserFromYellowPages(row["ApproverEmployeeID"].ToString());
+                if (user != null)
+                {
+                    currentList.Add(user);
+                }
+            }
+            this.ApproversList = currentList;
+            BindApproversRepeater();
         }
 
         protected void btnUpload_Click(object sender, EventArgs e)
@@ -50,7 +111,7 @@ namespace SR_System
             {
                 string originalFileName = Path.GetFileName(fileUploadInitialDocs.PostedFile.FileName);
                 string uniqueFileName = Guid.NewGuid().ToString() + "_" + originalFileName;
-                string uploadFolder = Server.MapPath(ConfigurationManager.AppSettings["FileUploadPath"]);
+                string uploadFolder = Server.MapPath(ConfigurationManager.AppSettings["InitialDocUploadPath"]);
                 if (!Directory.Exists(uploadFolder))
                 {
                     Directory.CreateDirectory(uploadFolder);
@@ -61,7 +122,7 @@ namespace SR_System
                 hdnFileInfo.Value = $"{uniqueFileName}|{originalFileName}";
 
                 hlUploadedFile.Text = $"已上傳: {originalFileName}";
-                hlUploadedFile.NavigateUrl = $"Handlers/FileDownloader.ashx?file={HttpUtility.UrlEncode(uniqueFileName)}";
+                hlUploadedFile.NavigateUrl = $"Handlers/FileDownloader.ashx?file={HttpUtility.UrlEncode(uniqueFileName)}&type=initial";
                 hlUploadedFile.Visible = true;
             }
             else
@@ -124,6 +185,18 @@ namespace SR_System
         {
             if (!Page.IsValid) return;
 
+            if (hdnSrId.Value == "0")
+            {
+                CreateNewSR();
+            }
+            else
+            {
+                UpdateExistingSR(Convert.ToInt32(hdnSrId.Value));
+            }
+        }
+
+        private void CreateNewSR()
+        {
             string engineerEmployeeId = hdnEngineerEmployeeId.Value;
             if (string.IsNullOrEmpty(engineerEmployeeId))
             {
@@ -178,7 +251,7 @@ namespace SR_System
 
                 NotificationHelper.SendNotificationForStatusChange(newSrId, "待開單主管審核");
 
-                Response.Redirect($"~/ViewSR.aspx?SRID={newSrId}");
+                Response.Redirect($"~/ViewSR.aspx?SR_Number={srNumber}");
             }
             catch (Exception ex)
             {
@@ -186,20 +259,87 @@ namespace SR_System
             }
         }
 
-        private int FindOrCreateUserInSystem(string employeeId)
+        private void UpdateExistingSR(int srId)
         {
-            string sanitizedEmployeeId = employeeId.Replace("'", "''");
-            string userQuery = $"SELECT UserID FROM ASE_BPCIM_SR_Users_DEFINE WHERE EmployeeID = N'{sanitizedEmployeeId}'";
-            object userIdObj = sqlConnect.Execute_Scalar("DefaultConnection", userQuery);
-
-            if (userIdObj != null)
+            string engineerEmployeeId = hdnEngineerEmployeeId.Value;
+            if (string.IsNullOrEmpty(engineerEmployeeId))
             {
-                return Convert.ToInt32(userIdObj);
+                ShowMessage("提交失敗：請選擇一位有效的CIM工程師。", "danger");
+                return;
             }
-            else
+
+            string requestorEmployeeId = Session["EmployeeID"].ToString();
+            string fileInfo = hdnFileInfo.Value;
+            string cimGroup = GetCimGroupForEngineer(engineerEmployeeId);
+
+            if (string.IsNullOrEmpty(cimGroup))
             {
-                string insertUserQuery = $"INSERT INTO ASE_BPCIM_SR_Users_DEFINE (EmployeeID) OUTPUT INSERTED.UserID VALUES (N'{sanitizedEmployeeId}');";
-                return (int)sqlConnect.Execute_Scalar("DefaultConnection", insertUserQuery);
+                ShowMessage("錯誤：找不到所選工程師對應的CIM組別。", "danger");
+                return;
+            }
+
+            try
+            {
+                string sanitizedTitle = txtTitle.Text.Trim().Replace("'", "''");
+                string sanitizedPurpose = txtPurpose.Text.Trim().Replace("'", "''");
+                string sanitizedScope = txtScope.Text.Trim().Replace("'", "''");
+                string sanitizedBenefit = txtBenefit.Text.Trim().Replace("'", "''");
+                string sanitizedFilePaths = (fileInfo ?? "").Replace("'", "''");
+                int statusId = GetStatusId("待開單主管審核");
+
+                string updateQuery = $@"
+                    UPDATE ASE_BPCIM_SR_HIS SET
+                    Title = N'{sanitizedTitle}',
+                    Purpose = N'{sanitizedPurpose}',
+                    Scope = N'{sanitizedScope}',
+                    Benefit = N'{sanitizedBenefit}',
+                    InitialDocPath = N'{sanitizedFilePaths}',
+                    CIM_Group = N'{cimGroup}',
+                    AssignedEngineerEmployeeID = N'{engineerEmployeeId}',
+                    CurrentStatusID = {statusId}
+                    WHERE SRID = {srId}";
+
+                sqlConnect.Insert_Table_DATA("DefaultConnection", updateQuery);
+
+                sqlConnect.Insert_Table_DATA("DefaultConnection", $"DELETE FROM ASE_BPCIM_SR_Approvers_HIS WHERE SRID = {srId}");
+                if (ApproversList.Any())
+                {
+                    foreach (var approver in ApproversList)
+                    {
+                        string approverEmpId = approver["EmployeeID"].ToString();
+                        string approverQuery = $@"
+                            INSERT INTO ASE_BPCIM_SR_Approvers_HIS (SRID, ApproverEmployeeID, ApprovalStatus)
+                            VALUES ({srId}, N'{approverEmpId}', N'待簽核');";
+                        sqlConnect.Insert_Table_DATA("DefaultConnection", approverQuery);
+                    }
+                }
+
+                string historyQuery = $@"
+                    INSERT INTO ASE_BPCIM_SR_Action_HIS (SRID, Action, ActionByEmployeeID, NewStatusID, Notes)
+                    VALUES ({srId}, N'重新提交SR', N'{requestorEmployeeId}', {statusId}, N'開單人修改後重新提交');";
+                sqlConnect.Insert_Table_DATA("DefaultConnection", historyQuery);
+
+                NotificationHelper.SendNotificationForStatusChange(srId, "待開單主管審核");
+
+                string srNumber = sqlConnect.Execute_Scalar("DefaultConnection", $"SELECT SR_Number FROM ASE_BPCIM_SR_HIS WHERE SRID = {srId}").ToString();
+                Response.Redirect($"~/ViewSR.aspx?SR_Number={srNumber}");
+            }
+            catch (Exception ex)
+            {
+                ShowMessage("更新失敗，發生錯誤: " + ex.Message, "danger");
+            }
+        }
+
+        protected void btnCancel_Click(object sender, EventArgs e)
+        {
+            int srId = Convert.ToInt32(hdnSrId.Value);
+            if (srId > 0)
+            {
+                string actionBy = Session["EmployeeID"].ToString();
+                int newStatusId = GetStatusId("已取消");
+                sqlConnect.Insert_Table_DATA("DefaultConnection", $"UPDATE ASE_BPCIM_SR_HIS SET CurrentStatusID = {newStatusId} WHERE SRID = {srId}");
+                sqlConnect.Insert_Table_DATA("DefaultConnection", $@"INSERT INTO ASE_BPCIM_SR_Action_HIS (SRID, Action, ActionByEmployeeID, NewStatusID, Notes) VALUES ({srId}, N'取消SR', N'{actionBy}', {newStatusId}, N'開單人取消此服務請求')");
+                Response.Redirect("~/Processing.aspx");
             }
         }
 
@@ -258,25 +398,6 @@ namespace SR_System
             string query = $"SELECT StatusID FROM ASE_BPCIM_SR_Statuses_DEFINE WHERE StatusName = N'{sanitizedStatusName}'";
             object result = sqlConnect.Execute_Scalar("DefaultConnection", query);
             return result != null ? Convert.ToInt32(result) : -1;
-        }
-
-        private string UploadFiles()
-        {
-            if (fileUploadInitialDocs.HasFile)
-            {
-                string originalFileName = Path.GetFileName(fileUploadInitialDocs.PostedFile.FileName);
-                string uniqueFileName = Guid.NewGuid().ToString() + "_" + originalFileName;
-                string uploadFolder = Server.MapPath(ConfigurationManager.AppSettings["FileUploadPath"]);
-                if (!Directory.Exists(uploadFolder))
-                {
-                    Directory.CreateDirectory(uploadFolder);
-                }
-                string filePath = Path.Combine(uploadFolder, uniqueFileName);
-                fileUploadInitialDocs.SaveAs(filePath);
-
-                return $"{uniqueFileName}|{originalFileName}";
-            }
-            return null;
         }
 
         private void ShowMessage(string message, string type)

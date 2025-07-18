@@ -150,6 +150,15 @@ namespace SR_System
         protected global::System.Web.UI.WebControls.GridView gvApprovers;
 
         /// <summary>
+        /// pnlActions 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Panel pnlActions;
+
+        /// <summary>
         /// txtActionComments 控制項。
         /// </summary>
         /// <remarks>
@@ -276,6 +285,15 @@ namespace SR_System
         protected global::System.Web.UI.WebControls.Button btnAssign;
 
         /// <summary>
+        /// btnLeaderReject 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button btnLeaderReject;
+
+        /// <summary>
         /// pnlEngineerAction 控制項。
         /// </summary>
         /// <remarks>
@@ -321,6 +339,15 @@ namespace SR_System
         protected global::System.Web.UI.WebControls.Button btnConfirmClosure;
 
         /// <summary>
+        /// btnEngineerReject 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button btnEngineerReject;
+
+        /// <summary>
         /// pnlUserAction 控制項。
         /// </summary>
         /// <remarks>
@@ -328,6 +355,15 @@ namespace SR_System
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
         protected global::System.Web.UI.WebControls.Panel pnlUserAction;
+
+        /// <summary>
+        /// upUserActions 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.UpdatePanel upUserActions;
 
         /// <summary>
         /// fileUploadClosureReport 控制項。
@@ -346,6 +382,60 @@ namespace SR_System
         /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
         /// </remarks>
         protected global::System.Web.UI.WebControls.Button btnUploadClosureReport;
+
+        /// <summary>
+        /// hlClosureFile 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HyperLink hlClosureFile;
+
+        /// <summary>
+        /// hdnClosureFileInfo 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HiddenField hdnClosureFileInfo;
+
+        /// <summary>
+        /// btnCompleteTest 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button btnCompleteTest;
+
+        /// <summary>
+        /// pnlRequesterEditAction 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Panel pnlRequesterEditAction;
+
+        /// <summary>
+        /// btnEditSR 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button btnEditSR;
+
+        /// <summary>
+        /// btnCancelSR 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button btnCancelSR;
 
         /// <summary>
         /// gvHistory 控制項。

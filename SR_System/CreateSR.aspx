@@ -1,14 +1,15 @@
 ﻿<%-- 
 ================================================================================
 檔案：/CreateSR.aspx
-變更：1. 將工程師的 HiddenField ID 從 hdnEngineerId 改為 hdnEngineerEmployeeId。
-      2. 修正了 JavaScript，使其能正確操作新的 HiddenField ID。
+功能：建立或編輯服務請求 (SR) 的使用者介面。
+變更：為「開單送出」和「重新送出」按鈕加入了 OnClientClick 確認對話框。
 ================================================================================
 --%>
 <%@ Page Title="開單 New SR" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="CreateSR.aspx.cs" Inherits="SR_System.CreateSR" %>
 
 <asp:Content ID="Content1" ContentPlaceHolderID="PrimaryContent" runat="server">
     <asp:Literal ID="litMessage" runat="server"></asp:Literal>
+    <asp:HiddenField ID="hdnSrId" runat="server" Value="0" />
 
     <div class="card mb-4">
         <div class="card-header">SR 基本資訊</div>
@@ -118,7 +119,13 @@
     </div>
     
     <div class="mt-4 text-end">
-        <asp:Button ID="btnSubmit" runat="server" Text="開單送出" OnClick="btnSubmit_Click" CssClass="btn btn-success btn-lg" ValidationGroup="SRValidation" />
+        <asp:Panel ID="pnlNewSrActions" runat="server">
+            <asp:Button ID="btnSubmit" runat="server" Text="開單送出" OnClick="btnSubmit_Click" CssClass="btn btn-success btn-lg" ValidationGroup="SRValidation" OnClientClick="return confirm('您確定要送出此張 SR 嗎？');" />
+        </asp:Panel>
+        <asp:Panel ID="pnlEditSrActions" runat="server" Visible="false">
+            <asp:Button ID="btnUpdate" runat="server" Text="重新送出" OnClick="btnSubmit_Click" CssClass="btn btn-warning btn-lg me-2" ValidationGroup="SRValidation" OnClientClick="return confirm('您確定要重新送出此張 SR 嗎？');" />
+            <asp:Button ID="btnCancel" runat="server" Text="取消 SR" OnClick="btnCancel_Click" CssClass="btn btn-danger btn-lg" OnClientClick="return confirm('您確定要取消此張 SR 嗎？此操作無法復原。');" />
+        </asp:Panel>
     </div>
 </asp:Content>
 

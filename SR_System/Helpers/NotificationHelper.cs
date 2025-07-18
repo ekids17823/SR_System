@@ -1,14 +1,15 @@
 ﻿// ================================================================================
 // 檔案：/Helpers/NotificationHelper.cs
 // 功能：集中處理所有郵件通知的邏輯。
-// 變更：1. 全面重構所有查詢，使其完全基於 EmployeeID 並從黃頁資料表獲取資訊。
-//       2. 修正了 GetApprovers 和 GetSrDetails 的邏輯。
-//       3. 新增了 GetCimBosses 和 GetCimLeader 方法以符合新的審核流程。
+// 變更：1. 根據您指定的範本，重構了郵件內容的產生方式。
+//       2. 補齊了所有流程節點的郵件通知邏輯。
 // ================================================================================
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
+using System.Web;
 using SR_System.DAL;
 
 namespace SR_System.Helpers
@@ -32,25 +33,19 @@ namespace SR_System.Helpers
         /// <summary>
         /// 根據 SR 狀態的變更，發送對應的通知郵件。
         /// </summary>
-        public static void SendNotificationForStatusChange(int srId, string newStatusName)
+        public static void SendNotificationForStatusChange(int srId, string newStatusName, string comment = "")
         {
             var srDetails = GetSrDetails(srId);
             if (srDetails == null) return;
 
-            string srNumber = srDetails["SR_Number"].ToString();
-            string title = srDetails["Title"].ToString();
-            string requestorEmployeeId = srDetails["RequestorEmployeeID"].ToString();
-            string cimGroup = srDetails["CIM_Group"].ToString();
-
-            string subject = $"[SR-{srNumber}] {newStatusName}: {title}";
-            string body = $"<p>您好，</p><p>關於服務請求單 <a href='http://your-server/ViewSR.aspx?SRID={srId}'>SR-{srNumber}</a> 有新的進度更新，目前狀態為：<b>{newStatusName}</b>。</p>";
             List<string> toList = new List<string>();
-            List<string> ccList = new List<string> { requestorEmployeeId }; // 開單人預設都會被 CC
+            List<string> ccList = new List<string> { srDetails.RequestorEmployeeID };
+            string lastAction = GetLastAction(srId);
 
             switch (newStatusName)
             {
                 case "待開單主管審核":
-                    var requesterManager = GetManagerFromYellowPages(requestorEmployeeId);
+                    var requesterManager = GetManagerFromYellowPages(srDetails.RequestorEmployeeID);
                     if (requesterManager != null) toList.Add(requesterManager);
                     break;
 
@@ -61,39 +56,88 @@ namespace SR_System.Helpers
                     break;
 
                 case "待CIM主管審核":
-                    toList.AddRange(GetCimBosses(cimGroup));
+                    toList.AddRange(GetCimBosses(srDetails.CimGroup));
                     break;
 
                 case "待CIM主任指派":
-                    toList.Add(GetCimLeader(cimGroup));
+                    toList.Add(GetCimLeader(srDetails.CimGroup));
                     break;
 
-                    // 其他狀態的通知可以陸續加入...
+                case "待工程師接單":
+                case "開發中":
+                case "待使用者測試":
+                case "待使用者上傳報告":
+                case "待程式上線":
+                case "待工程師結單":
+                    if (!string.IsNullOrEmpty(srDetails.AssignedEngineerEmployeeID))
+                        toList.Add(srDetails.AssignedEngineerEmployeeID);
+                    break;
+
+                case "已結案":
+                case "已拒絕":
+                case "待開單人修改":
+                case "已取消":
+                    toList.Add(srDetails.RequestorEmployeeID);
+                    break;
             }
 
             if (toList.Any())
             {
+                string body = BuildEmailBody(srDetails.SR_Number, srDetails, lastAction, comment);
+                string subject = $"[SR-{srDetails.SR_Number}] {newStatusName}: {srDetails.Title}";
                 SendEmail(subject, body, toList.Distinct().ToArray(), ccList.Distinct().ToArray());
             }
         }
 
-        private static Dictionary<string, object> GetSrDetails(int srId)
+        private static string BuildEmailBody(string srNumber, SrInfo sr, string lastAction, string comment)
+        {
+            var body = new StringBuilder();
+            body.AppendLine("---------------------Mail Start-------------------");
+            body.AppendLine("<br/><br/>");
+            body.AppendLine("Dear Sir : ");
+            body.AppendLine("<br/><br/>");
+            body.AppendLine("有張需求被提出，請審核 ");
+            body.AppendLine("<br/><br/>");
+            body.AppendLine($"<b>No:</b> {sr.SR_Number}<br/>");
+            body.AppendLine($"<b>Title:</b> {HttpUtility.HtmlEncode(sr.Title)}<br/>");
+            body.AppendLine($"<b>Purpose:</b> {HttpUtility.HtmlEncode(sr.Purpose)}<br/>");
+            body.AppendLine($"<b>Last Action:</b> {HttpUtility.HtmlEncode(lastAction)}<br/>");
+            body.AppendLine($"<b>Comment:</b> {HttpUtility.HtmlEncode(comment)}<br/>");
+            body.AppendLine("<br/>");
+            body.AppendLine($"詳細內容：請用滑鼠左鍵點兩下打開此份檔案 => <a href='http://your-website.com/ViewSR.aspx?SR_Number={srNumber}'>Link</a>");
+            body.AppendLine("<br/><br/>");
+            body.AppendLine("CIM SR System ");
+            body.AppendLine("<br/><br/>");
+            body.AppendLine("-----------------------Mail End------------------------");
+            return body.ToString();
+        }
+
+        private static SrInfo GetSrDetails(int srId)
         {
             SQLDBEntity sqlConnect = new SQLDBEntity();
-            string query = $"SELECT SR_Number, Title, RequestorEmployeeID, CIM_Group FROM ASE_BPCIM_SR_HIS WHERE SRID = {srId}";
+            string query = $"SELECT SR_Number, Title, Purpose, RequestorEmployeeID, CIM_Group, AssignedEngineerEmployeeID FROM ASE_BPCIM_SR_HIS WHERE SRID = {srId}";
             var dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
             if (dt.Rows.Count > 0)
             {
                 var row = dt.Rows[0];
-                return new Dictionary<string, object>
+                return new SrInfo
                 {
-                    {"SR_Number", row["SR_Number"]},
-                    {"Title", row["Title"]},
-                    {"RequestorEmployeeID", row["RequestorEmployeeID"]},
-                    {"CIM_Group", row["CIM_Group"]}
+                    SR_Number = row["SR_Number"].ToString(),
+                    Title = row["Title"].ToString(),
+                    Purpose = row["Purpose"].ToString(),
+                    RequestorEmployeeID = row["RequestorEmployeeID"].ToString(),
+                    CimGroup = row["CIM_Group"].ToString(),
+                    AssignedEngineerEmployeeID = row["AssignedEngineerEmployeeID"]?.ToString()
                 };
             }
             return null;
+        }
+
+        private static string GetLastAction(int srId)
+        {
+            SQLDBEntity sqlConnect = new SQLDBEntity();
+            string query = $"SELECT TOP 1 Action FROM ASE_BPCIM_SR_Action_HIS WHERE SRID = {srId} ORDER BY HistoryID DESC";
+            return sqlConnect.Execute_Scalar("DefaultConnection", query)?.ToString() ?? "N/A";
         }
 
         private static List<User> GetApprovers(int srId)
@@ -139,6 +183,16 @@ namespace SR_System.Helpers
             SQLDBEntity sqlConnect = new SQLDBEntity();
             string query = $"SELECT ManagerEmployeeID FROM ASE_BPCIM_SR_YellowPages_TEST WHERE EmployeeID = N'{employeeId.Replace("'", "''")}'";
             return sqlConnect.Execute_Scalar("DefaultConnection", query)?.ToString();
+        }
+
+        private class SrInfo
+        {
+            public string SR_Number { get; set; }
+            public string Title { get; set; }
+            public string Purpose { get; set; }
+            public string RequestorEmployeeID { get; set; }
+            public string CimGroup { get; set; }
+            public string AssignedEngineerEmployeeID { get; set; }
         }
 
         private class User
