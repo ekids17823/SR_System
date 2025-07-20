@@ -63,15 +63,51 @@ namespace SR_System
             }
 
             string query = $@"
-                SELECT sr.*, s.StatusName, 
-                       u_req_yp.Username AS RequestorName, 
-                       sr.RequestorEmployeeID, 
-                       u_eng_yp.Username AS EngineerName
-                FROM ASE_BPCIM_SR_HIS sr
-                JOIN ASE_BPCIM_SR_Statuses_DEFINE s ON sr.CurrentStatusID = s.StatusID
-                JOIN ASE_BPCIM_SR_YellowPages_TEST u_req_yp ON sr.RequestorEmployeeID = u_req_yp.EmployeeID
-                LEFT JOIN ASE_BPCIM_SR_YellowPages_TEST u_eng_yp ON sr.AssignedEngineerEmployeeID = u_eng_yp.EmployeeID
-                WHERE sr.SRID = {SRID}";
+                WITH NextApprover AS (
+                    SELECT 
+                        SRID, 
+                        ApproverEmployeeID,
+                        ROW_NUMBER() OVER(PARTITION BY SRID ORDER BY SRAID) AS rn
+                    FROM ASE_BPCIM_SR_Approvers_HIS
+                    WHERE ApprovalStatus = N'待簽核'
+                ),
+                SR_Details AS (
+                    SELECT 
+                        sr.*, 
+                        s.StatusName, 
+                        req_yp.Username AS RequestorName, 
+                        eng_yp.Username AS EngineerName,
+                        CASE 
+                            WHEN s.StatusName = N'待開單主管審核' THEN req_manager_yp.Username + ' (' + req_manager_yp.EmployeeID + ')'
+                            WHEN s.StatusName = N'待會簽審核' THEN next_app_yp.Username + ' (' + na.ApproverEmployeeID + ')'
+                            WHEN s.StatusName = N'待CIM主管審核' THEN 
+                                STUFF((
+                                    SELECT ', ' + b_yp.Username + ' (' + b.BossID + ')'
+                                    FROM (
+                                        SELECT CIM_Group, Boss1EmployeeID AS BossID FROM ASE_BPCIM_SR_CIMLeaders_DEFINE WHERE CIM_Group = sr.CIM_Group AND Boss1EmployeeID IS NOT NULL
+                                        UNION ALL
+                                        SELECT CIM_Group, Boss2EmployeeID AS BossID FROM ASE_BPCIM_SR_CIMLeaders_DEFINE WHERE CIM_Group = sr.CIM_Group AND Boss2EmployeeID IS NOT NULL
+                                    ) b
+                                    JOIN ASE_BPCIM_SR_YellowPages_TEST b_yp ON b.BossID = b_yp.EmployeeID
+                                    FOR XML PATH('')
+                                ), 1, 2, '')
+                            WHEN s.StatusName = N'待CIM主任指派' THEN leader_yp.Username + ' (' + cl.LeaderEmployeeID + ')'
+                            WHEN s.StatusName IN (N'待工程師接單', N'開發中', N'待使用者測試', N'待使用者上傳報告', N'待程式上線', N'待工程師結單') THEN eng_yp.Username + ' (' + sr.AssignedEngineerEmployeeID + ')'
+                            WHEN s.StatusName = N'待開單人修改' THEN req_yp.Username + ' (' + sr.RequestorEmployeeID + ')'
+                            ELSE 'N/A'
+                        END AS CurrentHandler
+                    FROM ASE_BPCIM_SR_HIS sr
+                    JOIN ASE_BPCIM_SR_Statuses_DEFINE s ON sr.CurrentStatusID = s.StatusID
+                    JOIN ASE_BPCIM_SR_YellowPages_TEST req_yp ON sr.RequestorEmployeeID = req_yp.EmployeeID
+                    LEFT JOIN ASE_BPCIM_SR_YellowPages_TEST req_manager_yp ON req_yp.ManagerEmployeeID = req_manager_yp.EmployeeID
+                    LEFT JOIN ASE_BPCIM_SR_YellowPages_TEST eng_yp ON sr.AssignedEngineerEmployeeID = eng_yp.EmployeeID
+                    LEFT JOIN ASE_BPCIM_SR_CIMLeaders_DEFINE cl ON sr.CIM_Group = cl.CIM_Group
+                    LEFT JOIN ASE_BPCIM_SR_YellowPages_TEST leader_yp ON cl.LeaderEmployeeID = leader_yp.EmployeeID
+                    LEFT JOIN NextApprover na ON sr.SRID = na.SRID AND na.rn = 1
+                    LEFT JOIN ASE_BPCIM_SR_YellowPages_TEST next_app_yp ON na.ApproverEmployeeID = next_app_yp.EmployeeID
+                    WHERE sr.SRID = {SRID}
+                )
+                SELECT * FROM SR_Details";
 
             DataTable dt = sqlConnect.Get_Table_DATA("DefaultConnection", query);
 
@@ -80,7 +116,11 @@ namespace SR_System
                 DataRow row = dt.Rows[0];
                 lblSrNumber.Text = row["SR_Number"].ToString();
                 lblTitle.Text = row["Title"].ToString();
-                lblStatus.Text = row["StatusName"].ToString();
+
+                string statusName = row["StatusName"].ToString();
+                string currentHandler = row["CurrentHandler"] != DBNull.Value ? row["CurrentHandler"].ToString() : "";
+                lblStatus.Text = string.IsNullOrEmpty(currentHandler) || currentHandler == "N/A" ? statusName : $"{statusName} ({currentHandler})";
+
                 lblRequestor.Text = $"{row["RequestorName"]} ({row["RequestorEmployeeID"]})";
                 lblSubmitDate.Text = Convert.ToDateTime(row["SubmitDate"]).ToString("yyyy-MM-dd");
 
@@ -92,6 +132,18 @@ namespace SR_System
                     lblAssignedEngineer.Text = row["EngineerName"].ToString();
                 if (row["PlannedCompletionDate"] != DBNull.Value)
                     lblPlannedCompletionDate.Text = Convert.ToDateTime(row["PlannedCompletionDate"]).ToString("yyyy-MM-dd");
+
+                if (row["EngineerAcceptanceDate"] != DBNull.Value)
+                {
+                    pnlAcceptanceDate.Visible = true;
+                    lblAcceptanceDate.Text = Convert.ToDateTime(row["EngineerAcceptanceDate"]).ToString("yyyy-MM-dd HH:mm");
+                }
+
+                if (row["EngineerConfirmClosureDate"] != DBNull.Value)
+                {
+                    pnlClosureDate.Visible = true;
+                    lblClosureDate.Text = Convert.ToDateTime(row["EngineerConfirmClosureDate"]).ToString("yyyy-MM-dd");
+                }
 
                 BindFiles(rptInitialDocs, row["InitialDocPath"].ToString());
                 ShowActionPanels(row);
@@ -286,6 +338,7 @@ namespace SR_System
         {
             if (string.IsNullOrWhiteSpace(txtActionComments.Text)) { ShowMessage("請填寫意見。", "warning"); return; }
             UpdateSRStatus(GetStatusId("開發中"), "工程師接單", txtActionComments.Text.Trim());
+            sqlConnect.Insert_Table_DATA("DefaultConnection", $"UPDATE ASE_BPCIM_SR_HIS SET EngineerAcceptanceDate = GETDATE() WHERE SRID = {SRID}");
             NotificationHelper.SendNotificationForStatusChange(SRID, "開發中");
             ReloadPage();
         }
@@ -315,15 +368,18 @@ namespace SR_System
 
         protected void btnCompleteTest_Click(object sender, EventArgs e)
         {
+            Page.Validate("CompleteTestValidation");
+            if (!Page.IsValid) return;
+
             if (string.IsNullOrEmpty(hdnClosureFileInfo.Value))
             {
                 ShowMessage("請先上傳測試報告。", "warning");
                 return;
             }
             string sanitizedFilePaths = hdnClosureFileInfo.Value.Replace("'", "''");
-            UpdateSRStatus(GetStatusId("待程式上線"), "完成測試", "使用者已完成測試並上傳報告。");
+            UpdateSRStatus(GetStatusId("待程式上線"), "完成測試", txtActionComments.Text.Trim());
             sqlConnect.Insert_Table_DATA("DefaultConnection", $"UPDATE ASE_BPCIM_SR_HIS SET ClosureReportPath = N'{sanitizedFilePaths}' WHERE SRID = {SRID}");
-            NotificationHelper.SendNotificationForStatusChange(SRID, "待程式上線");
+            NotificationHelper.SendNotificationForStatusChange(SRID, "待程式上線", txtActionComments.Text.Trim());
             ReloadPage();
         }
 
@@ -337,6 +393,7 @@ namespace SR_System
         protected void btnConfirmClosure_Click(object sender, EventArgs e)
         {
             UpdateSRStatus(GetStatusId("已結案"), "工程師結單", "工程師已結單，此 SR 已結案。");
+            sqlConnect.Insert_Table_DATA("DefaultConnection", $"UPDATE ASE_BPCIM_SR_HIS SET EngineerConfirmClosureDate = GETDATE() WHERE SRID = {SRID}");
             NotificationHelper.SendNotificationForStatusChange(SRID, "已結案");
             ReloadPage();
         }

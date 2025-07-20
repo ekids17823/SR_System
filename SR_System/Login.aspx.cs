@@ -60,7 +60,7 @@ namespace SR_System
             {
                 { "admin", "password123" }, { "user001", "password123" }, { "manager001", "password123" },
                 { "signoff01", "password123" }, { "signmanager01", "password123" },
-                { "cim_eng_a", "password123" }, { "cim_eng_b", "password123" },
+                { "cim_eng_a", "password123" }, { "cim_eng_b", "password123" }, { "cim_eng_c", "password123" },
                 { "leader1", "password123" }, { "leader2", "password123" },
                 { "boss1", "password123" }, { "boss2", "password123" }
             };

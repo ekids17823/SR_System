@@ -1,7 +1,8 @@
 ﻿// ================================================================================
 // 檔案：/Processing.aspx.cs
 // 功能：此頁面的後端程式碼，負責從資料庫載入所有待處理的 SR 資料。
-// 變更：修正了 gvProcessing_RowDataBound 事件，使其使用 SR_Number 產生連結。
+// 變更：修正了 BindGridView 中的 SQL 查詢，使其在「待使用者測試」和
+//       「待使用者上傳報告」狀態下，能正確地將「目前處理人」顯示為開單人。
 // ================================================================================
 using System;
 using System.Data;
@@ -77,8 +78,8 @@ namespace SR_System
                                     FOR XML PATH('')
                                 ), 1, 2, '')
                             WHEN s.StatusName = N'待CIM主任指派' THEN leader_yp.Username + ' (' + cl.LeaderEmployeeID + ')'
-                            WHEN s.StatusName IN (N'待工程師接單', N'開發中', N'待使用者測試', N'待使用者上傳報告', N'待程式上線', N'待工程師結單') THEN eng_yp.Username + ' (' + sr.AssignedEngineerEmployeeID + ')'
-                            WHEN s.StatusName = N'待開單人修改' THEN req_yp.Username + ' (' + sr.RequestorEmployeeID + ')'
+                            WHEN s.StatusName IN (N'待工程師接單', N'開發中', N'待程式上線', N'待工程師結單') THEN eng_yp.Username + ' (' + sr.AssignedEngineerEmployeeID + ')'
+                            WHEN s.StatusName IN (N'待使用者測試', N'待使用者上傳報告', N'待開單人修改') THEN req_yp.Username + ' (' + sr.RequestorEmployeeID + ')'
                             ELSE 'N/A'
                         END AS CurrentHandler
                     FROM ASE_BPCIM_SR_HIS sr

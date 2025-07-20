@@ -1,6 +1,7 @@
 ﻿// ================================================================================
 // 檔案：/Site.Master.cs
 // 功能：網站的共用母版頁後端程式碼。
+// 變更：在 GenerateNavLinks 方法中，為工程師和管理員新增了「結單歷史紀錄」的連結。
 // ================================================================================
 using System;
 using System.Web;
@@ -59,6 +60,12 @@ namespace SR_System
             navLinks.Append(CreateNavItem("~/CreateSR.aspx", "bi-file-earmark-plus-fill", "開單 New SR"));
             navLinks.Append(CreateNavItem("~/Processing.aspx", "bi-gear-fill", "處理中"));
             navLinks.Append(CreateNavItem("~/History.aspx", "bi-clock-history", "開單紀錄"));
+
+            // 只有工程師或管理員才看得到結單歷史紀錄
+            if (role == "工程師" || role == "Admin")
+            {
+                navLinks.Append(CreateNavItem("~/EngineerHistory.aspx", "bi-check2-square", "結單歷史紀錄"));
+            }
 
             if (role == "Admin")
             {

@@ -96,6 +96,42 @@ namespace SR_System
         protected global::System.Web.UI.WebControls.Label lblPlannedCompletionDate;
 
         /// <summary>
+        /// pnlAcceptanceDate 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Panel pnlAcceptanceDate;
+
+        /// <summary>
+        /// lblAcceptanceDate 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Label lblAcceptanceDate;
+
+        /// <summary>
+        /// pnlClosureDate 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Panel pnlClosureDate;
+
+        /// <summary>
+        /// lblClosureDate 控制項。
+        /// </summary>
+        /// <remarks>
+        /// 自動產生的欄位。
+        /// 若要修改，請將欄位宣告從設計工具檔案移到程式碼後置檔案。
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Label lblClosureDate;
+
+        /// <summary>
         /// litPurpose 控制項。
         /// </summary>
         /// <remarks>

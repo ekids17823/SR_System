@@ -2,8 +2,8 @@
 ================================================================================
 檔案：/ViewSR.aspx
 功能：顯示單一 SR 的詳細資訊，並根據使用者角色和 SR 狀態提供對應的操作。
-變更：1. 為「CIM 主任指派」區塊的所有欄位新增了 RequiredFieldValidator。
-      2. 將所有指派相關的控制項和驗證項都加入了 "AssignValidation" 群組。
+變更：1. 為 pnlUserAction 區塊的「完成測試」按鈕新增了 ValidationGroup。
+      2. 為 txtActionComments 新增了對應的 RequiredFieldValidator。
 ================================================================================
 --%>
 <%@ Page Title="查看 SR" Language="C#" MasterPageFile="~/Site.Master" AutoEventWireup="true" CodeBehind="ViewSR.aspx.cs" Inherits="SR_System.ViewSR" %>
@@ -30,6 +30,12 @@
                     <div class="col-md-6">
                         <p><strong>指派的工程師:</strong> <asp:Label ID="lblAssignedEngineer" runat="server">N/A</asp:Label></p>
                         <p><strong>預計完成日期:</strong> <asp:Label ID="lblPlannedCompletionDate" runat="server">N/A</asp:Label></p>
+                        <asp:Panel ID="pnlAcceptanceDate" runat="server" Visible="false">
+                            <p><strong>工程師接單時間:</strong> <asp:Label ID="lblAcceptanceDate" runat="server"></asp:Label></p>
+                        </asp:Panel>
+                        <asp:Panel ID="pnlClosureDate" runat="server" Visible="false">
+                            <p><strong>結案日期:</strong> <asp:Label ID="lblClosureDate" runat="server"></asp:Label></p>
+                        </asp:Panel>
                     </div>
                 </div>
                 <h5>目的</h5>
@@ -134,7 +140,8 @@
                                 <asp:HyperLink ID="hlClosureFile" runat="server" Visible="false" Target="_blank" CssClass="d-block mt-2"></asp:HyperLink>
                                 <asp:HiddenField ID="hdnClosureFileInfo" runat="server" />
                             </div>
-                            <asp:Button ID="btnCompleteTest" runat="server" Text="完成測試並通知工程師" OnClick="btnCompleteTest_Click" CssClass="btn btn-primary" OnClientClick="return confirm('您確定已完成測試嗎？');" />
+                            <asp:RequiredFieldValidator runat="server" ControlToValidate="txtActionComments" ErrorMessage="請填寫測試意見。" CssClass="text-danger" Display="Dynamic" ValidationGroup="CompleteTestValidation" />
+                            <asp:Button ID="btnCompleteTest" runat="server" Text="完成測試並通知工程師" OnClick="btnCompleteTest_Click" CssClass="btn btn-primary" OnClientClick="return confirm('您確定已完成測試嗎？');" ValidationGroup="CompleteTestValidation" />
                         </ContentTemplate>
                         <Triggers>
                             <asp:PostBackTrigger ControlID="btnUploadClosureReport" />
