@@ -184,6 +184,7 @@
     <Content Include="Scripts\WebForms\WebParts.js" />
     <Content Include="Scripts\WebForms\WebUIValidation.js" />
     <Content Include="Site.Master" />
+    <Content Include="Sql_Script\Database.sql" />
     <Content Include="ViewSR.aspx" />
     <Content Include="ViewSwitcher.ascx" />
     <Content Include="Web.config" />
